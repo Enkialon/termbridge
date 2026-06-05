@@ -52,13 +52,14 @@ flutter {
     }
 
     tasks.register("cargoBuild$taskPostfix", Exec) {
-        def rustManifest = file("../../rust/Cargo.toml")
+        def rustDir = file("../../rust")
         def jniLibsDir = file("src/main/jniLibs")
         def cargoNdkCommand = "cargo ndk " +
             "-t armeabi-v7a -t arm64-v8a -t x86 -t x86_64 " +
             "-o \"${jniLibsDir.absolutePath}\" " +
-            "--manifest-path \"${rustManifest.absolutePath}\" " +
             "build $profileMode"
+
+        workingDir rustDir
 
         if (android.ndkDirectory != null) {
             environment "ANDROID_NDK_HOME", android.ndkDirectory.absolutePath

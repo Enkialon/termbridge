@@ -4,7 +4,9 @@ use tokio::task::JoinHandle;
 
 use std::sync::Arc;
 
+#[cfg(not(target_os = "android"))]
 use crate::relay::connect_agent_tunnel;
+#[cfg(not(target_os = "android"))]
 use crate::ssh::{SshServerConfig, run_pty_ssh_server};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -55,26 +57,38 @@ impl AgentRuntime {
     }
 
     pub async fn start(&self, config: AgentConfig) -> anyhow::Result<()> {
-        self.stop().await?;
+        #[cfg(target_os = "android")]
+        {
+            let _ = config;
+            *self.status.lock().await = AgentStatus::Error {
+                message: "agent mode is not supported on Android".to_string(),
+            };
+            anyhow::bail!("agent mode is not supported on Android");
+        }
 
-        *self.status.lock().await = AgentStatus::Connecting;
+        #[cfg(not(target_os = "android"))]
+        {
+            self.stop().await?;
 
-        let status = self.status.clone();
-        let (stop_tx, stop_rx) = oneshot::channel::<()>();
-        let handle = tokio::spawn(async move {
-            let result = run_agent_once(config, stop_rx, status.clone()).await;
-            if let Err(error) = result {
-                *status.lock().await = AgentStatus::Error {
-                    message: error.to_string(),
-                };
-            }
-        });
+            *self.status.lock().await = AgentStatus::Connecting;
 
-        *self.task.lock().await = Some(AgentTask {
-            stop: stop_tx,
-            handle,
-        });
-        Ok(())
+            let status = self.status.clone();
+            let (stop_tx, stop_rx) = oneshot::channel::<()>();
+            let handle = tokio::spawn(async move {
+                let result = run_agent_once(config, stop_rx, status.clone()).await;
+                if let Err(error) = result {
+                    *status.lock().await = AgentStatus::Error {
+                        message: error.to_string(),
+                    };
+                }
+            });
+
+            *self.task.lock().await = Some(AgentTask {
+                stop: stop_tx,
+                handle,
+            });
+            Ok(())
+        }
     }
 
     pub async fn stop(&self) -> anyhow::Result<()> {
@@ -87,6 +101,7 @@ impl AgentRuntime {
     }
 }
 
+#[cfg(not(target_os = "android"))]
 async fn run_agent_once(
     config: AgentConfig,
     stop: oneshot::Receiver<()>,
