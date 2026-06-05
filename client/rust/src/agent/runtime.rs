@@ -4,7 +4,7 @@ use tokio::task::JoinHandle;
 
 use std::sync::Arc;
 
-use crate::relay::connect_agent_stream;
+use crate::relay::connect_agent_tunnel;
 use crate::ssh::{SshServerConfig, run_pty_ssh_server};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -92,12 +92,12 @@ async fn run_agent_once(
     stop: oneshot::Receiver<()>,
     status: Arc<Mutex<AgentStatus>>,
 ) -> anyhow::Result<()> {
-    let stream = connect_agent_stream(&config).await?;
+    let tunnel = connect_agent_tunnel(&config).await?;
     *status.lock().await = AgentStatus::Online;
 
     tokio::select! {
         result = run_pty_ssh_server(
-            stream,
+            tunnel,
             SshServerConfig {
                 password: Some(config.token),
                 shell: Some(config.shell),

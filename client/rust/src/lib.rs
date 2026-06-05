@@ -6,3 +6,4 @@ pub mod frb_api;
 pub mod pty;
 pub mod relay;
 pub mod ssh;
+pub mod tunnel;

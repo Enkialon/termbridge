@@ -8,10 +8,16 @@ use tokio::time::timeout;
 
 use crate::agent::AgentConfig;
 use crate::api::TerminalProfile;
+use crate::tunnel::Tunnel;
 
 use super::ControlMessage;
 
 const RELAY_CONNECT_TIMEOUT: Duration = Duration::from_secs(12);
+
+pub async fn connect_controller_tunnel(profile: &TerminalProfile) -> anyhow::Result<Tunnel> {
+    let stream = connect_controller_stream(profile).await?;
+    Ok(Tunnel::relay_tcp(stream))
+}
 
 pub async fn connect_controller_stream(profile: &TerminalProfile) -> anyhow::Result<TcpStream> {
     if profile.use_tls {
@@ -52,6 +58,11 @@ pub async fn connect_controller_stream(profile: &TerminalProfile) -> anyhow::Res
         }
         other => bail!("unexpected relay response: {other}"),
     }
+}
+
+pub async fn connect_agent_tunnel(config: &AgentConfig) -> anyhow::Result<Tunnel> {
+    let stream = connect_agent_stream(config).await?;
+    Ok(Tunnel::relay_tcp(stream))
 }
 
 pub async fn connect_agent_stream(config: &AgentConfig) -> anyhow::Result<TcpStream> {

@@ -1,7 +1,7 @@
 use anyhow::Context;
 
 use crate::api::TerminalProfile;
-use crate::relay::connect_controller_stream;
+use crate::relay::connect_controller_tunnel;
 use crate::ssh::{RemoteShell, ShellInput, SshClientConfig, open_remote_shell};
 
 #[derive(Default)]
@@ -25,9 +25,9 @@ impl ControllerRuntime {
     }
 
     pub async fn open_terminal(&self, profile: TerminalProfile) -> anyhow::Result<TerminalSession> {
-        let relay_stream = connect_controller_stream(&profile).await?;
+        let tunnel = connect_controller_tunnel(&profile).await?;
         let shell = open_remote_shell(
-            relay_stream,
+            tunnel,
             SshClientConfig {
                 username: profile.username.clone(),
                 password: profile.token.clone(),
