@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 
 import '../../agent/models/agent_config.dart';
 import '../../agent/models/agent_status.dart';
+import '../../agent/services/agent_runtime_coordinator.dart';
 import '../../agent/services/agent_service.dart';
 import '../../core/bridge/core_bridge.dart';
 import '../../shared/storage/agent_config_store.dart';
 import '../../shared/storage/profile_store.dart';
 import '../../shared/storage/service_group_store.dart';
+import '../../shared/services/relay_config_service.dart';
 import '../models/connection_profile.dart';
 import 'connection_editor_page.dart';
 import 'terminal_page.dart';
@@ -314,8 +316,9 @@ class _AgentPane extends StatefulWidget {
 }
 
 class _AgentPaneState extends State<_AgentPane> {
-  final _store = AgentConfigStore();
-  final _groupStore = ServiceGroupStore();
+  late final AgentRuntimeCoordinator _coordinator = AgentRuntimeCoordinator(
+    service: widget.service,
+  );
   final _formKey = GlobalKey<FormState>();
   final _deviceId = TextEditingController();
   final _shell = TextEditingController();
@@ -331,16 +334,16 @@ class _AgentPaneState extends State<_AgentPane> {
   }
 
   Future<void> _load() async {
-    final settings = await _store.load();
-    final groups = await _groupStore.loadAll();
+    final state = await _coordinator.load();
     if (!mounted) return;
-    final selectedGroupId = groups.any((group) => group.id == settings.serviceGroupId)
-        ? settings.serviceGroupId
-        : null;
+    final selectedGroupId =
+        state.groups.any((group) => group.id == state.settings.serviceGroupId)
+            ? state.settings.serviceGroupId
+            : null;
     setState(() {
-      _deviceId.text = settings.deviceId;
-      _shell.text = settings.shell;
-      _groups = groups;
+      _deviceId.text = state.settings.deviceId;
+      _shell.text = state.settings.shell;
+      _groups = state.groups;
       _selectedGroupId = selectedGroupId;
       _loaded = true;
     });
@@ -365,7 +368,7 @@ class _AgentPaneState extends State<_AgentPane> {
   Future<AgentSettings?> _save({bool showMessage = true}) async {
     final settings = _settingsFromForm();
     if (settings == null) return null;
-    await _store.save(settings);
+    await _coordinator.saveSettings(settings);
     if (mounted && showMessage) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('本机配置已保存')),
@@ -376,38 +379,23 @@ class _AgentPaneState extends State<_AgentPane> {
 
   Future<void> _start() async {
     final settings = await _save(showMessage: false);
+    if (!mounted) return;
     if (settings == null) return;
     final config = _agentConfig(settings);
     if (config == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('请选择一个有节点的中继服务器')),
+        const SnackBar(content: Text('请选择一个中继服务器')),
       );
       return;
     }
-    await _run(() => widget.service.start(config));
+    await _run(() => _coordinator.start(config));
   }
 
   AgentConfig? _agentConfig(AgentSettings settings) {
-    final groupId = settings.serviceGroupId;
-    if (groupId == null) return null;
-    for (final group in _groups) {
-      if (group.id == groupId && group.nodes.isNotEmpty) {
-        final node = group.nodes.first;
-        return AgentConfig(
-          relayHost: node.relayHost,
-          relayPort: node.relayPort,
-          deviceId: settings.deviceId,
-          token: node.token,
-          shell: settings.shell,
-          useTls: node.useTls,
-          allowBadCertificate: node.allowBadCertificate,
-        );
-      }
-    }
-    return null;
+    return _coordinator.resolveConfig(settings: settings, groups: _groups);
   }
 
-  Future<void> _stop() => _run(widget.service.stop);
+  Future<void> _stop() => _run(_coordinator.stop);
 
   Future<void> _run(Future<void> Function() action) async {
     setState(() {
@@ -437,7 +425,7 @@ class _AgentPaneState extends State<_AgentPane> {
     }
 
     return StreamBuilder<AgentStatus>(
-      stream: widget.service.watchStatus(),
+      stream: _coordinator.watchStatus(),
       initialData: AgentStatus.stopped(),
       builder: (context, snapshot) {
         final status = snapshot.data ?? AgentStatus.stopped();
@@ -480,7 +468,7 @@ class _AgentPaneState extends State<_AgentPane> {
                     Padding(
                       padding: const EdgeInsets.only(bottom: 12),
                       child: DropdownButtonFormField<String>(
-                        value: _selectedGroupId,
+                        initialValue: _selectedGroupId,
                         decoration: const InputDecoration(
                           border: OutlineInputBorder(),
                           labelText: '选择中继服务器',
@@ -491,9 +479,7 @@ class _AgentPaneState extends State<_AgentPane> {
                               (group) => DropdownMenuItem(
                                 value: group.id,
                                 child: Text(
-                                  group.name.isEmpty
-                                      ? '未命名中继服务器'
-                                      : group.name,
+                                  group.name.isEmpty ? '未命名中继服务器' : group.name,
                                 ),
                               ),
                             )
@@ -571,7 +557,6 @@ class _AgentPaneState extends State<_AgentPane> {
     }
     return null;
   }
-
 }
 
 class _RelayPane extends StatefulWidget {
@@ -582,11 +567,9 @@ class _RelayPane extends StatefulWidget {
 }
 
 class _RelayPaneState extends State<_RelayPane> {
-  final _store = ServiceGroupStore();
-  final _agentStore = AgentConfigStore();
+  final _service = RelayConfigService();
   final _formKey = GlobalKey<FormState>();
   final _name = TextEditingController();
-  final _nodeName = TextEditingController();
   final _host = TextEditingController();
   final _port = TextEditingController(text: '8080');
   final _token = TextEditingController();
@@ -604,7 +587,7 @@ class _RelayPaneState extends State<_RelayPane> {
   }
 
   Future<void> _load() async {
-    final groups = await _store.loadAll();
+    final groups = await _service.loadAll();
     if (!mounted) return;
     setState(() {
       _groups = groups;
@@ -617,7 +600,6 @@ class _RelayPaneState extends State<_RelayPane> {
     setState(() {
       _selected = null;
       _name.clear();
-      _nodeName.clear();
       _host.clear();
       _port.text = '8080';
       _token.clear();
@@ -627,49 +609,33 @@ class _RelayPaneState extends State<_RelayPane> {
   }
 
   void _select(ServiceGroup group) {
-    final node = group.nodes.isEmpty ? null : group.nodes.first;
     setState(() {
       _selected = group;
       _name.text = group.name;
-      _nodeName.text = node?.name ?? '';
-      _host.text = node?.relayHost ?? '';
-      _port.text = (node?.relayPort ?? 8080).toString();
-      _token.text = node?.token ?? '';
-      _useTls = node?.useTls ?? false;
-      _allowBadCertificate = node?.allowBadCertificate ?? false;
+      _host.text = group.relayHost;
+      _port.text = group.relayPort.toString();
+      _token.text = group.token;
+      _useTls = group.useTls;
+      _allowBadCertificate = group.allowBadCertificate;
     });
   }
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
-    final selected = _selected;
-    final node = ServiceNode(
-      id: DateTime.now().microsecondsSinceEpoch.toString(),
-      name: _nodeName.text.trim(),
-      relayHost: _host.text.trim(),
-      relayPort: int.parse(_port.text.trim()),
-      token: _token.text,
-      useTls: _useTls,
-      allowBadCertificate: _useTls && _allowBadCertificate,
+    final saved = await _service.save(
+      RelayConfigInput(
+        selected: _selected,
+        name: _name.text.trim(),
+        host: _host.text.trim(),
+        port: int.parse(_port.text.trim()),
+        token: _token.text,
+        useTls: _useTls,
+        allowBadCertificate: _allowBadCertificate,
+      ),
     );
-    final nodes = selected == null
-        ? [node]
-        : [
-            ...selected.nodes.where(
-              (value) =>
-                  value.relayHost != node.relayHost ||
-                  value.relayPort != node.relayPort,
-            ),
-            node,
-          ];
-    final group = ServiceGroup(
-      id: selected?.id ?? DateTime.now().microsecondsSinceEpoch.toString(),
-      name: _name.text.trim(),
-      nodes: nodes,
-      updatedAt: DateTime.now(),
-    );
-    await _store.save(group);
     await _load();
+    final reloaded = _groups.where((group) => group.id == saved.id);
+    if (reloaded.isNotEmpty) _select(reloaded.first);
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('中继服务器已保存')),
@@ -686,8 +652,7 @@ class _RelayPaneState extends State<_RelayPane> {
       return;
     }
 
-    final settings = await _agentStore.load();
-    await _agentStore.save(settings.copyWith(serviceGroupId: selected.id));
+    await _service.setAsAgentRelay(selected);
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('已设为本机中继服务器')),
@@ -698,7 +663,6 @@ class _RelayPaneState extends State<_RelayPane> {
   @override
   void dispose() {
     _name.dispose();
-    _nodeName.dispose();
     _host.dispose();
     _port.dispose();
     _token.dispose();
@@ -768,8 +732,11 @@ class _RelayPaneState extends State<_RelayPane> {
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
-                              subtitle:
-                                  Text('${group.nodes.length} 个节点'),
+                              subtitle: Text(
+                                group.relayHost.isEmpty
+                                    ? '未配置地址'
+                                    : '${group.relayHost}:${group.relayPort}',
+                              ),
                               onTap: () => _select(group),
                             ),
                           );
@@ -790,15 +757,15 @@ class _RelayPaneState extends State<_RelayPane> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('中继服务器配置', style: Theme.of(context).textTheme.titleLarge),
+                    Text('中继服务器配置',
+                        style: Theme.of(context).textTheme.titleLarge),
                     const SizedBox(height: 18),
                     _field(_name, '中继服务器名称', Icons.label_outline),
-                    _field(_nodeName, '节点名称', Icons.hub_outlined),
                     Row(
                       children: [
                         Expanded(
                           flex: 3,
-                          child: _field(_host, '节点地址', Icons.dns_outlined),
+                          child: _field(_host, '服务器地址', Icons.dns_outlined),
                         ),
                         const SizedBox(width: 12),
                         Expanded(

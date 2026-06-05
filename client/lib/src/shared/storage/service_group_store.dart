@@ -2,8 +2,8 @@ import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
-class ServiceNode {
-  const ServiceNode({
+class ServiceGroup {
+  const ServiceGroup({
     required this.id,
     required this.name,
     required this.relayHost,
@@ -11,6 +11,7 @@ class ServiceNode {
     required this.token,
     required this.useTls,
     required this.allowBadCertificate,
+    required this.updatedAt,
   });
 
   final String id;
@@ -20,6 +21,29 @@ class ServiceNode {
   final String token;
   final bool useTls;
   final bool allowBadCertificate;
+  final DateTime updatedAt;
+
+  ServiceGroup copyWith({
+    String? id,
+    String? name,
+    String? relayHost,
+    int? relayPort,
+    String? token,
+    bool? useTls,
+    bool? allowBadCertificate,
+    DateTime? updatedAt,
+  }) {
+    return ServiceGroup(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      relayHost: relayHost ?? this.relayHost,
+      relayPort: relayPort ?? this.relayPort,
+      token: token ?? this.token,
+      useTls: useTls ?? this.useTls,
+      allowBadCertificate: allowBadCertificate ?? this.allowBadCertificate,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
+  }
 
   Map<String, Object?> toJson() {
     return {
@@ -30,66 +54,29 @@ class ServiceNode {
       'token': token,
       'useTls': useTls,
       'allowBadCertificate': allowBadCertificate,
-    };
-  }
-
-  factory ServiceNode.fromJson(Map<String, Object?> json) {
-    return ServiceNode(
-      id: json['id'] as String? ?? DateTime.now().microsecondsSinceEpoch.toString(),
-      name: json['name'] as String? ?? '',
-      relayHost: json['relayHost'] as String? ?? '',
-      relayPort: json['relayPort'] as int? ?? 8080,
-      token: json['token'] as String? ?? '',
-      useTls: json['useTls'] as bool? ?? false,
-      allowBadCertificate: json['allowBadCertificate'] as bool? ?? false,
-    );
-  }
-}
-
-class ServiceGroup {
-  const ServiceGroup({
-    required this.id,
-    required this.name,
-    required this.nodes,
-    required this.updatedAt,
-  });
-
-  final String id;
-  final String name;
-  final List<ServiceNode> nodes;
-  final DateTime updatedAt;
-
-  ServiceGroup copyWith({
-    String? id,
-    String? name,
-    List<ServiceNode>? nodes,
-    DateTime? updatedAt,
-  }) {
-    return ServiceGroup(
-      id: id ?? this.id,
-      name: name ?? this.name,
-      nodes: nodes ?? this.nodes,
-      updatedAt: updatedAt ?? this.updatedAt,
-    );
-  }
-
-  Map<String, Object?> toJson() {
-    return {
-      'id': id,
-      'name': name,
-      'nodes': nodes.map((node) => node.toJson()).toList(),
       'updatedAt': updatedAt.toIso8601String(),
     };
   }
 
   factory ServiceGroup.fromJson(Map<String, Object?> json) {
+    final legacyNodes = (json['nodes'] as List<dynamic>? ?? [])
+        .whereType<Map<String, dynamic>>()
+        .toList();
+    final legacyNode = legacyNodes.isEmpty ? null : legacyNodes.first;
     return ServiceGroup(
       id: json['id'] as String? ?? 'default',
       name: json['name'] as String? ?? '',
-      nodes: (json['nodes'] as List<dynamic>? ?? [])
-          .whereType<Map<String, dynamic>>()
-          .map(ServiceNode.fromJson)
-          .toList(),
+      relayHost: json['relayHost'] as String? ??
+          legacyNode?['relayHost'] as String? ??
+          '',
+      relayPort:
+          json['relayPort'] as int? ?? legacyNode?['relayPort'] as int? ?? 8080,
+      token: json['token'] as String? ?? legacyNode?['token'] as String? ?? '',
+      useTls:
+          json['useTls'] as bool? ?? legacyNode?['useTls'] as bool? ?? false,
+      allowBadCertificate: json['allowBadCertificate'] as bool? ??
+          legacyNode?['allowBadCertificate'] as bool? ??
+          false,
       updatedAt: DateTime.tryParse(json['updatedAt'] as String? ?? '') ??
           DateTime.fromMillisecondsSinceEpoch(0),
     );
@@ -120,19 +107,14 @@ class ServiceGroupStore {
       final host = json['relayHost'] as String? ?? '';
       final port = json['relayPort'] as int? ?? 8080;
       return ServiceGroup(
-        id: json['id'] as String? ?? DateTime.now().microsecondsSinceEpoch.toString(),
+        id: json['id'] as String? ??
+            DateTime.now().microsecondsSinceEpoch.toString(),
         name: json['name'] as String? ?? '$host:$port',
-        nodes: [
-          ServiceNode(
-            id: 'node-${json['id'] ?? host}',
-            name: json['name'] as String? ?? '$host:$port',
-            relayHost: host,
-            relayPort: port,
-            token: json['token'] as String? ?? '',
-            useTls: json['useTls'] as bool? ?? false,
-            allowBadCertificate: json['allowBadCertificate'] as bool? ?? false,
-          ),
-        ],
+        relayHost: host,
+        relayPort: port,
+        token: json['token'] as String? ?? '',
+        useTls: json['useTls'] as bool? ?? false,
+        allowBadCertificate: json['allowBadCertificate'] as bool? ?? false,
         updatedAt: DateTime.tryParse(json['updatedAt'] as String? ?? '') ??
             DateTime.now(),
       );

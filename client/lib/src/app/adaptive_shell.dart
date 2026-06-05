@@ -5,6 +5,7 @@ import '../agent/ui/agent_page.dart';
 import '../core/bridge/core_bridge.dart';
 import '../controller/ui/connections_page.dart';
 import '../controller/ui/desktop_workspace.dart';
+import '../shared/ui/relay_page.dart';
 
 class AdaptiveShell extends StatelessWidget {
   const AdaptiveShell({
@@ -46,6 +47,7 @@ class _MobileShellState extends State<_MobileShell> {
       AgentPage(
         service: AgentService(bridge: widget.bridge),
       ),
+      const RelayPage(),
     ];
 
     return Scaffold(
@@ -70,6 +72,11 @@ class _MobileShellState extends State<_MobileShell> {
             icon: Icon(Icons.devices_outlined),
             selectedIcon: Icon(Icons.devices),
             label: '本机',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.hub_outlined),
+            selectedIcon: Icon(Icons.hub),
+            label: '中继服务器',
           ),
         ],
       ),

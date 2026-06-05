@@ -107,7 +107,7 @@ class GeneratedFrbCoreApi implements FrbCoreApi {
       deviceId: profile.deviceId,
       sessionId: profile.sessionId,
       token: profile.token,
-      username: profile.username,
+      username: profile.effectiveUsername,
       useTls: profile.useTls,
       allowBadCertificate: profile.allowBadCertificate,
     );

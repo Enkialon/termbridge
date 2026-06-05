@@ -25,6 +25,11 @@ class ConnectionProfile {
   final bool allowBadCertificate;
   final DateTime updatedAt;
 
+  String get effectiveUsername {
+    final value = username.trim();
+    return value.isEmpty ? deviceId.trim() : value;
+  }
+
   ConnectionProfile copyWith({
     String? id,
     String? name,

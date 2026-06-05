@@ -66,12 +66,8 @@ class _ConnectionEditorPageState extends State<ConnectionEditorPage> {
     String? selectedGroupId;
     final relayPort = int.tryParse(_port.text.trim());
     for (final group in groups) {
-      final matched = group.nodes.any(
-        (node) =>
-            node.relayHost == _host.text.trim() &&
-            node.relayPort == relayPort,
-      );
-      if (matched) {
+      if (group.relayHost == _host.text.trim() &&
+          group.relayPort == relayPort) {
         selectedGroupId = group.id;
         break;
       }
@@ -103,8 +99,7 @@ class _ConnectionEditorPageState extends State<ConnectionEditorPage> {
       deviceId: _deviceId.text.trim(),
       sessionId: _sessionId.text.trim(),
       token: _token.text,
-      username:
-          _username.text.trim().isEmpty ? 'mobile' : _username.text.trim(),
+      username: _username.text.trim(),
       useTls: _useTls,
       allowBadCertificate: _useTls && _allowBadCertificate,
     );
@@ -144,7 +139,7 @@ class _ConnectionEditorPageState extends State<ConnectionEditorPage> {
     final port = int.tryParse(_port.text.trim());
     if (_host.text.trim().isEmpty || port == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('请先填写节点地址和端口')),
+        const SnackBar(content: Text('请先填写服务器地址和端口')),
       );
       return;
     }
@@ -152,17 +147,11 @@ class _ConnectionEditorPageState extends State<ConnectionEditorPage> {
     final group = ServiceGroup(
       id: DateTime.now().microsecondsSinceEpoch.toString(),
       name: '${_host.text.trim()}:$port',
-      nodes: [
-        ServiceNode(
-          id: 'node-${DateTime.now().microsecondsSinceEpoch}',
-          name: '${_host.text.trim()}:$port',
-          relayHost: _host.text.trim(),
-          relayPort: port,
-          token: _token.text,
-          useTls: _useTls,
-          allowBadCertificate: _useTls && _allowBadCertificate,
-        ),
-      ],
+      relayHost: _host.text.trim(),
+      relayPort: port,
+      token: _token.text,
+      useTls: _useTls,
+      allowBadCertificate: _useTls && _allowBadCertificate,
       updatedAt: DateTime.now(),
     );
     await _serviceGroupStore.save(group);
@@ -182,15 +171,14 @@ class _ConnectionEditorPageState extends State<ConnectionEditorPage> {
         break;
       }
     }
-    if (group == null || group.nodes.isEmpty) return;
-    final node = group.nodes.first;
+    if (group == null) return;
     setState(() {
       _selectedServiceGroupId = id;
-      _host.text = node.relayHost;
-      _port.text = node.relayPort.toString();
-      _token.text = node.token;
-      _useTls = node.useTls;
-      _allowBadCertificate = node.allowBadCertificate;
+      _host.text = group!.relayHost;
+      _port.text = group.relayPort.toString();
+      _token.text = group.token;
+      _useTls = group.useTls;
+      _allowBadCertificate = group.allowBadCertificate;
     });
   }
 
@@ -219,7 +207,7 @@ class _ConnectionEditorPageState extends State<ConnectionEditorPage> {
                     Padding(
                       padding: const EdgeInsets.only(bottom: 12),
                       child: DropdownButtonFormField<String>(
-                        value: _selectedServiceGroupId,
+                        initialValue: _selectedServiceGroupId,
                         decoration: const InputDecoration(
                           border: OutlineInputBorder(),
                           labelText: '选择中继服务器',
@@ -238,7 +226,7 @@ class _ConnectionEditorPageState extends State<ConnectionEditorPage> {
                         onChanged: _applyServiceGroup,
                       ),
                     ),
-                  _field(_host, '节点地址', Icons.dns_outlined),
+                  _field(_host, '服务器地址', Icons.dns_outlined),
                   _field(
                     _port,
                     '端口',
@@ -282,14 +270,12 @@ class _ConnectionEditorPageState extends State<ConnectionEditorPage> {
               _Section(
                 title: '目标',
                 children: [
-                  _field(_deviceId, '设备 ID', Icons.computer_outlined),
-                  _field(_sessionId, '会话 ID', Icons.tag_outlined),
+                  _field(_deviceId, '要连接的设备 ID', Icons.computer_outlined),
                 ],
               ),
               _Section(
                 title: '认证',
                 children: [
-                  _field(_username, 'SSH 用户名', Icons.person_outline),
                   _field(
                     _token,
                     'Token',
@@ -307,6 +293,13 @@ class _ConnectionEditorPageState extends State<ConnectionEditorPage> {
                       ),
                     ),
                   ),
+                ],
+              ),
+              _Section(
+                title: '高级',
+                children: [
+                  _field(_sessionId, '会话 ID', Icons.tag_outlined),
+                  _field(_username, '用户名', Icons.person_outline),
                 ],
               ),
             ],

@@ -62,8 +62,10 @@ class ProfileStore {
   }
 
   ConnectionProfile createProfile() {
+    final now = DateTime.now().microsecondsSinceEpoch;
     return ConnectionProfile.defaults.copyWith(
-      id: DateTime.now().microsecondsSinceEpoch.toString(),
+      id: now.toString(),
+      sessionId: 'session-$now',
       updatedAt: DateTime.now(),
     );
   }
