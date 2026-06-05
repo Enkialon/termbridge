@@ -1,0 +1,74 @@
+plugins {
+    id "com.android.application"
+    id "dev.flutter.flutter-gradle-plugin"
+}
+
+android {
+    namespace = "dev.mobile_remote_terminal.app"
+    compileSdk = flutter.compileSdkVersion
+
+    defaultConfig {
+        applicationId = "dev.mobile_remote_terminal.app"
+        minSdkVersion = flutter.minSdkVersion
+        targetSdk = flutter.targetSdkVersion
+        versionCode = flutter.versionCode
+        versionName = flutter.versionName
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    buildTypes {
+        release {
+            signingConfig signingConfigs.debug
+        }
+    }
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
+    }
+}
+
+flutter {
+    source = "../.."
+}
+
+[
+    new Tuple2("Debug", ""),
+    new Tuple2("Profile", "--release"),
+    new Tuple2("Release", "--release")
+].each {
+    def taskPostfix = it.first
+    def profileMode = it.second
+
+    tasks.whenTaskAdded { task ->
+        if (task.name == "javaPreCompile$taskPostfix") {
+            task.dependsOn "cargoBuild$taskPostfix"
+        }
+    }
+
+    tasks.register("cargoBuild$taskPostfix", Exec) {
+        def rustManifest = file("../../rust/Cargo.toml")
+        def jniLibsDir = file("src/main/jniLibs")
+        def cargoNdkCommand = "cargo ndk " +
+            "-t armeabi-v7a -t arm64-v8a -t x86 -t x86_64 " +
+            "-o \"${jniLibsDir.absolutePath}\" " +
+            "--manifest-path \"${rustManifest.absolutePath}\" " +
+            "build $profileMode"
+
+        if (android.ndkDirectory != null) {
+            environment "ANDROID_NDK_HOME", android.ndkDirectory.absolutePath
+            environment "ANDROID_NDK", android.ndkDirectory.absolutePath
+        }
+
+        if (org.gradle.nativeplatform.platform.internal.DefaultNativePlatform.currentOperatingSystem.isWindows()) {
+            commandLine "cmd", "/C", cargoNdkCommand
+        } else {
+            commandLine "sh", "-c", cargoNdkCommand
+        }
+    }
+}
