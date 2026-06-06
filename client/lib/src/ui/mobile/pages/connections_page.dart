@@ -67,6 +67,32 @@ class _ConnectionsPageState extends State<ConnectionsPage> {
     _reload();
   }
 
+  Future<void> _delete(ConnectionProfile profile) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('删除会话'),
+          content: Text('确定删除“${profile.name}”吗？'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('删除'),
+            ),
+          ],
+        );
+      },
+    );
+    if (confirmed != true) return;
+    await widget.connectionService.delete(profile);
+    if (!mounted) return;
+    _reload();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -101,6 +127,7 @@ class _ConnectionsPageState extends State<ConnectionsPage> {
                   profile: profile,
                   onConnect: () => _openTerminal(profile),
                   onEdit: () => _openEditor(profile),
+                  onDelete: () => _delete(profile),
                 );
               },
             );
@@ -116,11 +143,13 @@ class _ConnectionTile extends StatelessWidget {
     required this.profile,
     required this.onConnect,
     required this.onEdit,
+    required this.onDelete,
   });
 
   final ConnectionProfile profile;
   final VoidCallback onConnect;
   final VoidCallback onEdit;
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -178,6 +207,11 @@ class _ConnectionTile extends StatelessWidget {
                 tooltip: '编辑',
                 onPressed: onEdit,
                 icon: const Icon(Icons.edit_outlined),
+              ),
+              IconButton(
+                tooltip: '删除',
+                onPressed: onDelete,
+                icon: const Icon(Icons.delete_outline),
               ),
             ],
           ),

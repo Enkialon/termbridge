@@ -130,7 +130,7 @@ class _AgentPageState extends State<AgentPage> {
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text('本机')),
+      appBar: AppBar(title: const Text('远程控制设置')),
       body: SafeArea(
         child: StreamBuilder<AgentStatus>(
           stream: widget.service.watchStatus(),
@@ -139,13 +139,15 @@ class _AgentPageState extends State<AgentPage> {
             final status = snapshot.data ?? AgentStatus.stopped();
             final online = status.kind == AgentStatusKind.online ||
                 status.kind == AgentStatusKind.connecting;
+            final statusTitle = _agentStatusTitle(status);
+            final statusMessage = _agentStatusMessage(status);
             return Form(
               key: _formKey,
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
                 children: [
                   _Section(
-                    title: '状态',
+                    title: '允许被远程控制',
                     children: [
                       ListTile(
                         contentPadding: EdgeInsets.zero,
@@ -155,13 +157,13 @@ class _AgentPageState extends State<AgentPage> {
                               ? const Color(0xff70c082)
                               : Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
-                        title: Text(status.kind.name),
-                        subtitle: Text(status.message ?? '未连接'),
+                        title: Text(statusTitle),
+                        subtitle: Text(statusMessage),
                       ),
                     ],
                   ),
                   _Section(
-                    title: '本机',
+                    title: '本机信息',
                     children: [
                       _field(_deviceId, '设备 ID', Icons.computer_outlined),
                       _field(_shell, 'Shell', Icons.terminal_outlined),
@@ -309,6 +311,28 @@ class _AgentPageState extends State<AgentPage> {
     }
     return null;
   }
+}
+
+String _agentStatusTitle(AgentStatus status) {
+  return switch (status.kind) {
+    AgentStatusKind.stopped => '未启动',
+    AgentStatusKind.connecting => '启动中',
+    AgentStatusKind.online => '已启动',
+    AgentStatusKind.error => '启动失败',
+    AgentStatusKind.unsupported => '当前平台不支持',
+  };
+}
+
+String _agentStatusMessage(AgentStatus status) {
+  final message = status.message;
+  if (message != null && message.isNotEmpty) return message;
+  return switch (status.kind) {
+    AgentStatusKind.stopped => '启动后，其他设备可以通过中继连接到本机',
+    AgentStatusKind.connecting => '正在连接中继服务器',
+    AgentStatusKind.online => '本机已允许远程控制',
+    AgentStatusKind.error => '请检查中继服务器和本机配置',
+    AgentStatusKind.unsupported => '当前平台暂不支持远程控制',
+  };
 }
 
 class _Section extends StatelessWidget {

@@ -17,4 +17,10 @@ class ConnectionService {
     await _profiles.save(saved);
     return saved;
   }
+
+  Future<void> delete(ConnectionProfile profile) async {
+    final profiles = await _profiles.loadAll();
+    profiles.removeWhere((value) => value.id == profile.id);
+    await _profiles.saveAll(profiles);
+  }
 }

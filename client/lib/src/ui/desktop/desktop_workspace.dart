@@ -27,8 +27,15 @@ class DesktopWorkspace extends StatefulWidget {
 class _DesktopWorkspaceState extends State<DesktopWorkspace> {
   late Future<List<ConnectionProfile>> _profiles =
       widget.services.connections.loadAll();
+  late final Widget _agentPane;
   ConnectionProfile? _selectedProfile;
   var _section = _DesktopSection.connections;
+
+  @override
+  void initState() {
+    super.initState();
+    _agentPane = _AgentPane(service: widget.services.agent);
+  }
 
   void _reload() {
     setState(() {
@@ -62,6 +69,35 @@ class _DesktopWorkspaceState extends State<DesktopWorkspace> {
     });
   }
 
+  Future<void> _delete(ConnectionProfile profile) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('删除会话'),
+          content: Text('确定删除“${profile.name}”吗？'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('删除'),
+            ),
+          ],
+        );
+      },
+    );
+    if (confirmed != true) return;
+    await widget.services.connections.delete(profile);
+    if (!mounted) return;
+    setState(() {
+      if (_selectedProfile?.id == profile.id) _selectedProfile = null;
+      _profiles = widget.services.connections.loadAll();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -76,9 +112,11 @@ class _DesktopWorkspaceState extends State<DesktopWorkspace> {
             },
           ),
           const VerticalDivider(width: 1),
-          switch (_section) {
-            _DesktopSection.connections => Expanded(
-                child: Row(
+          Expanded(
+            child: IndexedStack(
+              index: _section.index,
+              children: [
+                Row(
                   children: [
                     SizedBox(
                       width: 320,
@@ -87,6 +125,7 @@ class _DesktopWorkspaceState extends State<DesktopWorkspace> {
                         selectedProfile: _selectedProfile,
                         onOpen: _open,
                         onEdit: _edit,
+                        onDelete: _delete,
                         onCreate: () => _edit(),
                       ),
                     ),
@@ -99,14 +138,11 @@ class _DesktopWorkspaceState extends State<DesktopWorkspace> {
                     ),
                   ],
                 ),
-              ),
-            _DesktopSection.agent => Expanded(
-                child: _AgentPane(service: widget.services.agent),
-              ),
-            _DesktopSection.services => Expanded(
-                child: _RelayPane(service: widget.services.relay),
-              ),
-          },
+                _RelayPane(service: widget.services.relay),
+                _agentPane,
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -115,8 +151,8 @@ class _DesktopWorkspaceState extends State<DesktopWorkspace> {
 
 enum _DesktopSection {
   connections,
-  agent,
   services,
+  agent,
 }
 
 class _DesktopNav extends StatelessWidget {
@@ -165,14 +201,14 @@ class _DesktopNav extends StatelessWidget {
             label: Text('会话'),
           ),
           NavigationRailDestination(
-            icon: Icon(Icons.devices_outlined),
-            selectedIcon: Icon(Icons.devices),
-            label: Text('本机'),
-          ),
-          NavigationRailDestination(
             icon: Icon(Icons.hub_outlined),
             selectedIcon: Icon(Icons.hub),
             label: Text('中继服务器'),
+          ),
+          NavigationRailDestination(
+            icon: Icon(Icons.devices_outlined),
+            selectedIcon: Icon(Icons.devices),
+            label: Text('本机'),
           ),
         ],
       ),
@@ -186,6 +222,7 @@ class _ConnectionPane extends StatelessWidget {
     required this.selectedProfile,
     required this.onOpen,
     required this.onEdit,
+    required this.onDelete,
     required this.onCreate,
   });
 
@@ -193,6 +230,7 @@ class _ConnectionPane extends StatelessWidget {
   final ConnectionProfile? selectedProfile;
   final ValueChanged<ConnectionProfile> onOpen;
   final ValueChanged<ConnectionProfile> onEdit;
+  final ValueChanged<ConnectionProfile> onDelete;
   final VoidCallback onCreate;
 
   @override
@@ -262,10 +300,20 @@ class _ConnectionPane extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                       ),
                       leading: const Icon(Icons.terminal),
-                      trailing: IconButton(
-                        tooltip: '编辑',
-                        onPressed: () => onEdit(profile),
-                        icon: const Icon(Icons.edit_outlined),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            tooltip: '编辑',
+                            onPressed: () => onEdit(profile),
+                            icon: const Icon(Icons.edit_outlined),
+                          ),
+                          IconButton(
+                            tooltip: '删除',
+                            onPressed: () => onDelete(profile),
+                            icon: const Icon(Icons.delete_outline),
+                          ),
+                        ],
                       ),
                       onTap: () => onOpen(profile),
                     ),
@@ -313,6 +361,28 @@ class _AgentPane extends StatefulWidget {
 
   @override
   State<_AgentPane> createState() => _AgentPaneState();
+}
+
+String _agentStatusTitle(AgentStatus status) {
+  return switch (status.kind) {
+    AgentStatusKind.stopped => '未启动',
+    AgentStatusKind.connecting => '启动中',
+    AgentStatusKind.online => '已启动',
+    AgentStatusKind.error => '启动失败',
+    AgentStatusKind.unsupported => '当前平台不支持',
+  };
+}
+
+String _agentStatusMessage(AgentStatus status) {
+  final message = status.message;
+  if (message != null && message.isNotEmpty) return message;
+  return switch (status.kind) {
+    AgentStatusKind.stopped => '启动后，其他设备可以通过中继连接到本机',
+    AgentStatusKind.connecting => '正在连接中继服务器',
+    AgentStatusKind.online => '本机已允许远程控制',
+    AgentStatusKind.error => '请检查中继服务器和本机配置',
+    AgentStatusKind.unsupported => '当前平台暂不支持远程控制',
+  };
 }
 
 class _AgentPaneState extends State<_AgentPane> {
@@ -433,6 +503,8 @@ class _AgentPaneState extends State<_AgentPane> {
         final status = snapshot.data ?? AgentStatus.stopped();
         final online = status.kind == AgentStatusKind.online ||
             status.kind == AgentStatusKind.connecting;
+        final statusTitle = _agentStatusTitle(status);
+        final statusMessage = _agentStatusMessage(status);
         return SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: ConstrainedBox(
@@ -442,8 +514,12 @@ class _AgentPaneState extends State<_AgentPane> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('本机', style: Theme.of(context).textTheme.titleLarge),
+                  Text('远程控制设置',
+                      style: Theme.of(context).textTheme.titleLarge),
                   const SizedBox(height: 18),
+                  Text('允许被远程控制',
+                      style: Theme.of(context).textTheme.titleSmall),
+                  const SizedBox(height: 8),
                   ListTile(
                     contentPadding: EdgeInsets.zero,
                     leading: Icon(
@@ -452,10 +528,12 @@ class _AgentPaneState extends State<_AgentPane> {
                           ? const Color(0xff70c082)
                           : Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
-                    title: Text(status.kind.name),
-                    subtitle: Text(status.message ?? '未连接'),
+                    title: Text(statusTitle),
+                    subtitle: Text(statusMessage),
                   ),
                   const SizedBox(height: 18),
+                  Text('本机信息', style: Theme.of(context).textTheme.titleSmall),
+                  const SizedBox(height: 8),
                   _field(_deviceId, '设备 ID', Icons.computer_outlined),
                   _field(_shell, 'Shell', Icons.terminal_outlined),
                   _field(

@@ -47,8 +47,8 @@ class _MobileShellState extends State<_MobileShell> {
         terminalService: widget.services.terminal,
         relayService: widget.services.relay,
       ),
-      AgentPage(service: widget.services.agent),
       RelayPage(service: widget.services.relay),
+      AgentPage(service: widget.services.agent),
     ];
 
     return Scaffold(
@@ -70,14 +70,14 @@ class _MobileShellState extends State<_MobileShell> {
             label: '会话',
           ),
           NavigationDestination(
-            icon: Icon(Icons.devices_outlined),
-            selectedIcon: Icon(Icons.devices),
-            label: '本机',
-          ),
-          NavigationDestination(
             icon: Icon(Icons.hub_outlined),
             selectedIcon: Icon(Icons.hub),
             label: '中继服务器',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.devices_outlined),
+            selectedIcon: Icon(Icons.devices),
+            label: '本机',
           ),
         ],
       ),
