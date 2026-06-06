@@ -17,6 +17,7 @@ class RelayPage extends StatefulWidget {
 
 class _RelayPageState extends State<RelayPage> {
   late Future<List<ServiceGroup>> _groups = widget.service.loadAll();
+  final _testing = <String>{};
 
   void _reload() {
     setState(() {
@@ -34,6 +35,25 @@ class _RelayPageState extends State<RelayPage> {
       ),
     );
     if (saved == true) _reload();
+  }
+
+  Future<void> _test(ServiceGroup group) async {
+    if (_testing.contains(group.id)) return;
+    setState(() => _testing.add(group.id));
+    try {
+      final saved = await widget.service.testAndSave(group);
+      if (!mounted) return;
+      setState(() {
+        _groups = widget.service.loadAll();
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_relayTestMessage(saved))),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _testing.remove(group.id));
+      }
+    }
   }
 
   @override
@@ -73,22 +93,48 @@ class _RelayPageState extends State<RelayPage> {
                 return Material(
                   color: const Color(0xff11181c),
                   borderRadius: BorderRadius.circular(8),
-                  child: ListTile(
-                    leading: const Icon(Icons.hub_outlined),
-                    title: Text(
-                      group.name.isEmpty ? '未命名中继服务器' : group.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    subtitle: Text(
-                      group.relayHost.isEmpty
-                          ? '未配置地址'
-                          : '${group.relayHost}:${group.relayPort}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    trailing: const Icon(Icons.chevron_right),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(8),
                     onTap: () => _openEditor(group),
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 10, 12),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.hub_outlined),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  group.name.isEmpty
+                                      ? '未命名中继服务器'
+                                      : group.name,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  group.relayHost.isEmpty
+                                      ? '未配置地址'
+                                      : '${group.relayHost}:${group.relayPort}',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: Theme.of(context).textTheme.bodySmall,
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          _RelayTestButton(
+                            group: group,
+                            testing: _testing.contains(group.id),
+                            onPressed: () => _test(group),
+                          ),
+                          const Icon(Icons.chevron_right),
+                        ],
+                      ),
+                    ),
                   ),
                 );
               },
@@ -169,6 +215,9 @@ class _RelayEditorPageState extends State<RelayEditorPage> {
   Future<void> _saveAndClose() async {
     final saved = await _save();
     if (!mounted || saved == null) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(_relayTestMessage(saved))),
+    );
     Navigator.of(context).pop(true);
   }
 
@@ -294,6 +343,51 @@ class _RelayEditorPageState extends State<RelayEditorPage> {
       return '请输入 1-65535';
     }
     return null;
+  }
+}
+
+String _relayTestLabel(ServiceGroup group) {
+  if (group.lastLatencyMs != null) return '${group.lastLatencyMs}ms';
+  if (group.lastTestError != null) return group.lastTestError!;
+  return '测试';
+}
+
+String _relayTestMessage(ServiceGroup group) {
+  if (group.lastLatencyMs != null) {
+    return '中继服务器已保存，延迟 ${group.lastLatencyMs}ms';
+  }
+  return '中继服务器已保存，测试${group.lastTestError ?? '未完成'}';
+}
+
+IconData _relayTestIcon(ServiceGroup group) {
+  if (group.lastLatencyMs != null) return Icons.speed_outlined;
+  if (group.lastTestError != null) return Icons.error_outline;
+  return Icons.network_check_outlined;
+}
+
+class _RelayTestButton extends StatelessWidget {
+  const _RelayTestButton({
+    required this.group,
+    required this.testing,
+    required this.onPressed,
+  });
+
+  final ServiceGroup group;
+  final bool testing;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextButton.icon(
+      onPressed: testing ? null : onPressed,
+      icon: testing
+          ? const SizedBox.square(
+              dimension: 16,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : Icon(_relayTestIcon(group), size: 18),
+      label: Text(_relayTestLabel(group)),
+    );
   }
 }
 

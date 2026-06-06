@@ -8,6 +8,9 @@ class ServiceGroup {
     required this.useTls,
     required this.allowBadCertificate,
     required this.updatedAt,
+    this.lastLatencyMs,
+    this.lastTestedAt,
+    this.lastTestError,
   });
 
   final String id;
@@ -18,6 +21,9 @@ class ServiceGroup {
   final bool useTls;
   final bool allowBadCertificate;
   final DateTime updatedAt;
+  final int? lastLatencyMs;
+  final DateTime? lastTestedAt;
+  final String? lastTestError;
 
   ServiceGroup copyWith({
     String? id,
@@ -28,6 +34,11 @@ class ServiceGroup {
     bool? useTls,
     bool? allowBadCertificate,
     DateTime? updatedAt,
+    int? lastLatencyMs,
+    DateTime? lastTestedAt,
+    String? lastTestError,
+    bool clearLastLatency = false,
+    bool clearLastTestError = false,
   }) {
     return ServiceGroup(
       id: id ?? this.id,
@@ -38,6 +49,11 @@ class ServiceGroup {
       useTls: useTls ?? this.useTls,
       allowBadCertificate: allowBadCertificate ?? this.allowBadCertificate,
       updatedAt: updatedAt ?? this.updatedAt,
+      lastLatencyMs:
+          clearLastLatency ? null : lastLatencyMs ?? this.lastLatencyMs,
+      lastTestedAt: lastTestedAt ?? this.lastTestedAt,
+      lastTestError:
+          clearLastTestError ? null : lastTestError ?? this.lastTestError,
     );
   }
 
@@ -51,6 +67,9 @@ class ServiceGroup {
       'useTls': useTls,
       'allowBadCertificate': allowBadCertificate,
       'updatedAt': updatedAt.toIso8601String(),
+      'lastLatencyMs': lastLatencyMs,
+      'lastTestedAt': lastTestedAt?.toIso8601String(),
+      'lastTestError': lastTestError,
     };
   }
 
@@ -64,6 +83,12 @@ class ServiceGroup {
       useTls: json['useTls'] as bool,
       allowBadCertificate: json['allowBadCertificate'] as bool,
       updatedAt: DateTime.parse(json['updatedAt'] as String),
+      lastLatencyMs: json['lastLatencyMs'] as int?,
+      lastTestedAt: switch (json['lastTestedAt']) {
+        final String value => DateTime.parse(value),
+        _ => null,
+      },
+      lastTestError: json['lastTestError'] as String?,
     );
   }
 }
