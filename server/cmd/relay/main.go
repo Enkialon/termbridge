@@ -6,8 +6,9 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net"
+	"os"
 	"sync"
 	"time"
 
@@ -19,8 +20,98 @@ const (
 	agentSendTimeout    = 5 * time.Second
 )
 
+// ---------------------------------------------------------------------------
+// Rate limiting / ban
+// ---------------------------------------------------------------------------
+
+type banTracker struct {
+	mu             sync.Mutex
+	ipFails        map[string]int
+	ipBanned        map[string]bool
+	deviceFails    map[string]int
+	deviceBanned    map[string]bool
+	ipMaxFails     int
+	deviceMaxFails int
+}
+
+func newBanTracker(ipMax, deviceMax int) *banTracker {
+	return &banTracker{
+		ipFails:        make(map[string]int),
+		ipBanned:        make(map[string]bool),
+		deviceFails:    make(map[string]int),
+		deviceBanned:    make(map[string]bool),
+		ipMaxFails:     ipMax,
+		deviceMaxFails: deviceMax,
+	}
+}
+
+// recordIPFail increments the failure count for ip. Returns true if the IP
+// reached the ban threshold (and is now banned).
+func (b *banTracker) recordIPFail(ip string) bool {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	if b.ipBanned[ip] {
+		return true
+	}
+	b.ipFails[ip]++
+	if b.ipFails[ip] >= b.ipMaxFails {
+		b.ipBanned[ip] = true
+		delete(b.ipFails, ip)
+		return true
+	}
+	return false
+}
+
+// recordDeviceFail increments the failure count for deviceId. Returns true if
+// the deviceId reached the ban threshold.
+func (b *banTracker) recordDeviceFail(deviceID string) bool {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	if b.deviceBanned[deviceID] {
+		return true
+	}
+	b.deviceFails[deviceID]++
+	if b.deviceFails[deviceID] >= b.deviceMaxFails {
+		b.deviceBanned[deviceID] = true
+		delete(b.deviceFails, deviceID)
+		return true
+	}
+	return false
+}
+
+func (b *banTracker) isIPBanned(ip string) bool {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.ipBanned[ip]
+}
+
+func (b *banTracker) isDeviceBanned(deviceID string) bool {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.deviceBanned[deviceID]
+}
+
+func (b *banTracker) ipFailCount(ip string) int {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.ipFails[ip]
+}
+
+func (b *banTracker) deviceFailCount(deviceID string) int {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.deviceFails[deviceID]
+}
+
+// ---------------------------------------------------------------------------
+// Relay server
+// ---------------------------------------------------------------------------
+
 type relayServer struct {
 	relayAPIKey string
+	ban         *banTracker
 
 	mu       sync.Mutex
 	agents   map[string]*agentConn
@@ -47,17 +138,23 @@ func main() {
 	relayAPIKey := flag.String("relay-api-key", "", "shared relay API key; empty disables relay auth")
 	tlsCert := flag.String("tls-cert", "", "TLS certificate file; requires -tls-key")
 	tlsKey := flag.String("tls-key", "", "TLS private key file; requires -tls-cert")
+	ipBanThreshold := flag.Int("ip-ban-threshold", 3, "failed auth attempts before IP is permanently banned")
+	deviceBanThreshold := flag.Int("device-ban-threshold", 10, "failed auth attempts before deviceId is permanently banned")
 	flag.Parse()
+
+	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo})))
 
 	s := &relayServer{
 		relayAPIKey: *relayAPIKey,
+		ban:         newBanTracker(*ipBanThreshold, *deviceBanThreshold),
 		agents:      make(map[string]*agentConn),
 		sessions:    make(map[string]*pendingSession),
 	}
 
 	ln, err := listen(*addr, *tlsCert, *tlsKey)
 	if err != nil {
-		log.Fatal(err)
+		slog.Error("listen failed", "err", err)
+		os.Exit(1)
 	}
 	defer ln.Close()
 
@@ -65,12 +162,15 @@ func main() {
 	if *tlsCert != "" || *tlsKey != "" {
 		mode = "tls"
 	}
-	log.Printf("relay listening on %s mode=%s", *addr, mode)
+	slog.Info("relay listening", "addr", *addr, "mode", mode, "ipBanThreshold", *ipBanThreshold, "deviceBanThreshold", *deviceBanThreshold)
+	if *tlsCert == "" {
+		slog.Warn("TLS is not enabled — relay traffic is unencrypted; set -tls-cert and -tls-key")
+	}
 
 	for {
 		conn, err := ln.Accept()
 		if err != nil {
-			log.Printf("accept: %v", err)
+			slog.Error("accept", "err", err)
 			continue
 		}
 		go s.handleConn(conn)
@@ -96,16 +196,53 @@ func listen(addr, certFile, keyFile string) (net.Listener, error) {
 }
 
 func (s *relayServer) handleConn(conn net.Conn) {
+	remoteIP := ipFromAddr(conn.RemoteAddr())
+
+	// Check IP ban before reading anything.
+	if s.ban.isIPBanned(remoteIP) {
+		slog.Warn("rejected banned IP", "remoteIP", remoteIP)
+		_ = conn.Close()
+		return
+	}
+
 	_ = conn.SetReadDeadline(time.Now().Add(firstMessageTimeout))
 	msg, err := shared.ReadControl(conn)
 	if err != nil {
-		log.Printf("read hello from %s: %v", conn.RemoteAddr(), err)
+		slog.Info("read hello", "remoteIP", remoteIP, "err", err)
 		_ = conn.Close()
 		return
 	}
 	_ = conn.SetReadDeadline(time.Time{})
 
+	// Check deviceId ban.
+	if msg.DeviceID != "" && s.ban.isDeviceBanned(msg.DeviceID) {
+		slog.Warn("rejected banned device", "remoteIP", remoteIP, "deviceId", msg.DeviceID)
+		_ = shared.WriteError(conn, "device banned")
+		_ = conn.Close()
+		return
+	}
+
 	if !s.authorized(msg.RelayAPIKey) {
+		deviceID := msg.DeviceID
+		slog.Warn("auth failed",
+			"remoteIP", remoteIP,
+			"deviceId", deviceID,
+			"ipFailCount", s.ban.ipFailCount(remoteIP)+1,
+			"deviceFailCount", s.ban.deviceFailCount(deviceID)+1,
+		)
+
+		ipBanned := s.ban.recordIPFail(remoteIP)
+		if ipBanned {
+			slog.Error("IP permanently banned", "remoteIP", remoteIP)
+		}
+
+		if deviceID != "" {
+			deviceBanned := s.ban.recordDeviceFail(deviceID)
+			if deviceBanned {
+				slog.Error("deviceId permanently banned", "deviceId", deviceID)
+			}
+		}
+
 		_ = shared.WriteError(conn, "unauthorized")
 		_ = conn.Close()
 		return
@@ -119,12 +256,15 @@ func (s *relayServer) handleConn(conn net.Conn) {
 	case shared.TypeAgentSession:
 		s.handleAgentSession(conn, msg)
 	default:
+		slog.Warn("unknown first message type", "remoteIP", remoteIP, "type", msg.Type)
 		_ = shared.WriteError(conn, "unknown first message type %q", msg.Type)
 		_ = conn.Close()
 	}
 }
 
 func (s *relayServer) handleAgentControl(conn net.Conn, msg shared.ControlMessage) {
+	remoteIP := ipFromAddr(conn.RemoteAddr())
+
 	if msg.DeviceID == "" {
 		_ = shared.WriteError(conn, "missing deviceId")
 		_ = conn.Close()
@@ -146,7 +286,7 @@ func (s *relayServer) handleAgentControl(conn net.Conn, msg shared.ControlMessag
 	s.agents[msg.DeviceID] = agent
 	s.mu.Unlock()
 
-	log.Printf("agent online device=%s", msg.DeviceID)
+	slog.Info("agent online", "deviceId", msg.DeviceID, "remoteIP", remoteIP)
 	if err := shared.WriteReady(conn); err != nil {
 		s.removeAgent(agent)
 		_ = conn.Close()
@@ -156,7 +296,7 @@ func (s *relayServer) handleAgentControl(conn net.Conn, msg shared.ControlMessag
 	agent.writeLoop()
 	s.removeAgent(agent)
 	_ = conn.Close()
-	log.Printf("agent offline device=%s", msg.DeviceID)
+	slog.Info("agent offline", "deviceId", msg.DeviceID)
 }
 
 func (a *agentConn) writeLoop() {
@@ -178,6 +318,8 @@ func (a *agentConn) writeLoop() {
 }
 
 func (s *relayServer) handleClient(conn net.Conn, msg shared.ControlMessage) {
+	remoteIP := ipFromAddr(conn.RemoteAddr())
+
 	if msg.DeviceID == "" || msg.SessionID == "" {
 		_ = shared.WriteError(conn, "missing deviceId or sessionId")
 		_ = conn.Close()
@@ -201,12 +343,13 @@ func (s *relayServer) handleClient(conn net.Conn, msg shared.ControlMessage) {
 	case agent.send <- sessionOpen:
 	case <-time.After(agentSendTimeout):
 		s.removePendingSession(msg.DeviceID, msg.SessionID, conn)
+		slog.Warn("agent busy, session rejected", "deviceId", msg.DeviceID, "sessionId", msg.SessionID)
 		_ = shared.WriteError(conn, "agent busy")
 		_ = conn.Close()
 		return
 	}
 	go s.expirePendingSession(msg.DeviceID, msg.SessionID, conn, 15*time.Second)
-	log.Printf("client waiting device=%s session=%s", msg.DeviceID, msg.SessionID)
+	slog.Info("client waiting", "deviceId", msg.DeviceID, "sessionId", msg.SessionID, "remoteIP", remoteIP)
 }
 
 func (s *relayServer) prepareSession(deviceID, sessionID string, client net.Conn) (*agentConn, error) {
@@ -285,9 +428,9 @@ func (s *relayServer) handleAgentSession(conn net.Conn, msg shared.ControlMessag
 		return
 	}
 
-	log.Printf("session paired device=%s session=%s", msg.DeviceID, msg.SessionID)
+	slog.Info("session paired", "deviceId", msg.DeviceID, "sessionId", msg.SessionID)
 	bridge(client, conn)
-	log.Printf("session closed device=%s session=%s", msg.DeviceID, msg.SessionID)
+	slog.Info("session closed", "deviceId", msg.DeviceID, "sessionId", msg.SessionID)
 }
 
 func (s *relayServer) takeClient(deviceID, sessionID string) (net.Conn, error) {
@@ -333,4 +476,12 @@ func (s *relayServer) authorized(relayAPIKey string) bool {
 
 func sessionKey(deviceID, sessionID string) string {
 	return deviceID + "\x00" + sessionID
+}
+
+func ipFromAddr(addr net.Addr) string {
+	host, _, err := net.SplitHostPort(addr.String())
+	if err != nil {
+		return addr.String()
+	}
+	return host
 }
