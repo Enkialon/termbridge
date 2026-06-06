@@ -21,8 +21,10 @@ class _AgentPageState extends State<AgentPage> {
   final _formKey = GlobalKey<FormState>();
   final _deviceId = TextEditingController();
   final _shell = TextEditingController();
+  final _password = TextEditingController();
   var _groups = <ServiceGroup>[];
   String? _selectedGroupId;
+  var _showPassword = false;
   var _busy = false;
   var _loaded = false;
 
@@ -42,6 +44,7 @@ class _AgentPageState extends State<AgentPage> {
     setState(() {
       _deviceId.text = state.settings.deviceId;
       _shell.text = state.settings.shell;
+      _password.text = state.settings.password;
       _groups = state.groups;
       _selectedGroupId = selectedGroupId;
       _loaded = true;
@@ -52,6 +55,7 @@ class _AgentPageState extends State<AgentPage> {
   void dispose() {
     _deviceId.dispose();
     _shell.dispose();
+    _password.dispose();
     super.dispose();
   }
 
@@ -60,6 +64,7 @@ class _AgentPageState extends State<AgentPage> {
     return AgentSettings(
       deviceId: _deviceId.text.trim(),
       shell: _shell.text.trim(),
+      password: _password.text,
       serviceGroupId: _selectedGroupId,
     );
   }
@@ -160,6 +165,26 @@ class _AgentPageState extends State<AgentPage> {
                     children: [
                       _field(_deviceId, '设备 ID', Icons.computer_outlined),
                       _field(_shell, 'Shell', Icons.terminal_outlined),
+                      _field(
+                        _password,
+                        'SSH 密码',
+                        Icons.password_outlined,
+                        obscureText: !_showPassword,
+                        validator: (_) => null,
+                        suffixIcon: IconButton(
+                          tooltip: _showPassword ? '隐藏 SSH 密码' : '显示 SSH 密码',
+                          onPressed: () {
+                            setState(
+                              () => _showPassword = !_showPassword,
+                            );
+                          },
+                          icon: Icon(
+                            _showPassword
+                                ? Icons.visibility_off_outlined
+                                : Icons.visibility_outlined,
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                   _Section(

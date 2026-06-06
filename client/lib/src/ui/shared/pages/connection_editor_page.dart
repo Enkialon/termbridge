@@ -37,14 +37,16 @@ class _ConnectionEditorPageState extends State<ConnectionEditorPage> {
   late final TextEditingController _port;
   late final TextEditingController _deviceId;
   late final TextEditingController _sessionId;
-  late final TextEditingController _token;
+  late final TextEditingController _relayApiKey;
+  late final TextEditingController _password;
   late final TextEditingController _username;
 
   late bool _useTls;
   late bool _allowBadCertificate;
   var _serviceGroups = <ServiceGroup>[];
   String? _selectedServiceGroupId;
-  bool _showToken = false;
+  bool _showRelayApiKey = false;
+  bool _showPassword = false;
   bool _saving = false;
 
   @override
@@ -58,7 +60,8 @@ class _ConnectionEditorPageState extends State<ConnectionEditorPage> {
     );
     _deviceId = TextEditingController(text: profile.deviceId);
     _sessionId = TextEditingController(text: profile.sessionId);
-    _token = TextEditingController(text: profile.token);
+    _relayApiKey = TextEditingController(text: profile.relayApiKey);
+    _password = TextEditingController(text: profile.password);
     _username = TextEditingController(text: profile.username);
     _useTls = profile.useTls;
     _allowBadCertificate = profile.allowBadCertificate;
@@ -90,23 +93,22 @@ class _ConnectionEditorPageState extends State<ConnectionEditorPage> {
     _port.dispose();
     _deviceId.dispose();
     _sessionId.dispose();
-    _token.dispose();
+    _relayApiKey.dispose();
+    _password.dispose();
     _username.dispose();
     super.dispose();
   }
 
   ConnectionProfile? _profileFromForm() {
     if (!_formKey.currentState!.validate()) return null;
-    final sessionId = _sessionId.text.trim();
     return widget.profile.copyWith(
       name: _name.text.trim(),
       relayHost: _host.text.trim(),
       relayPort: int.parse(_port.text.trim()),
       deviceId: _deviceId.text.trim(),
-      sessionId: sessionId.isEmpty
-          ? 'session-${DateTime.now().microsecondsSinceEpoch}'
-          : sessionId,
-      token: _token.text,
+      sessionId: _sessionId.text.trim(),
+      relayApiKey: _relayApiKey.text,
+      password: _password.text,
       username: _username.text.trim(),
       useTls: _useTls,
       allowBadCertificate: _useTls && _allowBadCertificate,
@@ -118,9 +120,9 @@ class _ConnectionEditorPageState extends State<ConnectionEditorPage> {
     if (profile == null || _saving) return null;
 
     setState(() => _saving = true);
-    await widget.connectionService.save(profile);
+    final saved = await widget.connectionService.save(profile);
     if (mounted) setState(() => _saving = false);
-    return profile;
+    return saved;
   }
 
   Future<void> _saveAndClose() async {
@@ -160,7 +162,7 @@ class _ConnectionEditorPageState extends State<ConnectionEditorPage> {
         name: '${_host.text.trim()}:$port',
         host: _host.text.trim(),
         port: port,
-        token: _token.text,
+        relayApiKey: _relayApiKey.text,
         useTls: _useTls,
         allowBadCertificate: _allowBadCertificate,
       ),
@@ -186,7 +188,7 @@ class _ConnectionEditorPageState extends State<ConnectionEditorPage> {
       _selectedServiceGroupId = id;
       _host.text = group!.relayHost;
       _port.text = group.relayPort.toString();
-      _token.text = group.token;
+      _relayApiKey.text = group.relayApiKey;
       _useTls = group.useTls;
       _allowBadCertificate = group.allowBadCertificate;
     });
@@ -287,17 +289,17 @@ class _ConnectionEditorPageState extends State<ConnectionEditorPage> {
                 title: '认证',
                 children: [
                   _field(
-                    _token,
-                    'Token',
+                    _relayApiKey,
+                    'Relay API Key',
                     Icons.key_outlined,
-                    obscureText: !_showToken,
+                    obscureText: !_showRelayApiKey,
                     suffixIcon: IconButton(
-                      tooltip: _showToken ? '隐藏 Token' : '显示 Token',
+                      tooltip: _showRelayApiKey ? '隐藏 API Key' : '显示 API Key',
                       onPressed: () {
-                        setState(() => _showToken = !_showToken);
+                        setState(() => _showRelayApiKey = !_showRelayApiKey);
                       },
                       icon: Icon(
-                        _showToken
+                        _showRelayApiKey
                             ? Icons.visibility_off_outlined
                             : Icons.visibility_outlined,
                       ),
@@ -321,6 +323,24 @@ class _ConnectionEditorPageState extends State<ConnectionEditorPage> {
                     '会话 ID',
                     Icons.tag_outlined,
                     validator: (_) => null,
+                  ),
+                  _field(
+                    _password,
+                    'SSH 密码',
+                    Icons.password_outlined,
+                    obscureText: !_showPassword,
+                    validator: (_) => null,
+                    suffixIcon: IconButton(
+                      tooltip: _showPassword ? '隐藏 SSH 密码' : '显示 SSH 密码',
+                      onPressed: () {
+                        setState(() => _showPassword = !_showPassword);
+                      },
+                      icon: Icon(
+                        _showPassword
+                            ? Icons.visibility_off_outlined
+                            : Icons.visibility_outlined,
+                      ),
+                    ),
                   ),
                   _field(
                     _username,

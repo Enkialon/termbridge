@@ -30,7 +30,7 @@ impl ControllerRuntime {
             tunnel,
             SshClientConfig {
                 username: profile.username.clone(),
-                password: profile.token.clone(),
+                password: profile.password.clone(),
             },
             TerminalResize::default(),
         )

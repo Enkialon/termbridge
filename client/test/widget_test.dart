@@ -10,7 +10,7 @@ void main() {
 
     await tester.pumpWidget(
       RemoteTerminalApp(
-        services: AppServices.defaults(
+        services: AppServices.create(
           runtime: const UnsupportedRustCoreBridge(),
           terminalPort: const UnsupportedRustCoreBridge(),
         ),

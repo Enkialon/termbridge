@@ -3,7 +3,8 @@ class AgentConfig {
     required this.relayHost,
     required this.relayPort,
     required this.deviceId,
-    required this.token,
+    required this.relayApiKey,
+    required this.password,
     required this.shell,
     required this.useTls,
     required this.allowBadCertificate,
@@ -12,7 +13,8 @@ class AgentConfig {
   final String relayHost;
   final int relayPort;
   final String deviceId;
-  final String token;
+  final String relayApiKey;
+  final String password;
   final String shell;
   final bool useTls;
   final bool allowBadCertificate;
@@ -21,7 +23,8 @@ class AgentConfig {
     String? relayHost,
     int? relayPort,
     String? deviceId,
-    String? token,
+    String? relayApiKey,
+    String? password,
     String? shell,
     bool? useTls,
     bool? allowBadCertificate,
@@ -30,7 +33,8 @@ class AgentConfig {
       relayHost: relayHost ?? this.relayHost,
       relayPort: relayPort ?? this.relayPort,
       deviceId: deviceId ?? this.deviceId,
-      token: token ?? this.token,
+      relayApiKey: relayApiKey ?? this.relayApiKey,
+      password: password ?? this.password,
       shell: shell ?? this.shell,
       useTls: useTls ?? this.useTls,
       allowBadCertificate: allowBadCertificate ?? this.allowBadCertificate,

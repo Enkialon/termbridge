@@ -18,6 +18,7 @@ class SharedPreferencesAgentSettingsRepository
       return AgentSettings(
         deviceId: json['deviceId'] as String,
         shell: json['shell'] as String,
+        password: json['password'] as String,
         serviceGroupId: json['serviceGroupId'] as String?,
       );
     }
@@ -25,6 +26,7 @@ class SharedPreferencesAgentSettingsRepository
     return const AgentSettings(
       deviceId: '',
       shell: '',
+      password: '',
       serviceGroupId: null,
     );
   }
@@ -37,6 +39,7 @@ class SharedPreferencesAgentSettingsRepository
       jsonEncode({
         'deviceId': settings.deviceId,
         'shell': settings.shell,
+        'password': settings.password,
         'serviceGroupId': settings.serviceGroupId,
       }),
     );

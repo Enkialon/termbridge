@@ -6,7 +6,8 @@ class ConnectionProfile {
     required this.relayPort,
     required this.deviceId,
     required this.sessionId,
-    required this.token,
+    required this.relayApiKey,
+    required this.password,
     required this.username,
     required this.useTls,
     required this.allowBadCertificate,
@@ -19,7 +20,8 @@ class ConnectionProfile {
   final int relayPort;
   final String deviceId;
   final String sessionId;
-  final String token;
+  final String relayApiKey;
+  final String password;
   final String username;
   final bool useTls;
   final bool allowBadCertificate;
@@ -30,6 +32,13 @@ class ConnectionProfile {
     return value.isEmpty ? deviceId.trim() : value;
   }
 
+  ConnectionProfile ensureSessionId() {
+    if (sessionId.trim().isNotEmpty) return this;
+    return copyWith(
+      sessionId: 'session-${DateTime.now().microsecondsSinceEpoch}',
+    );
+  }
+
   ConnectionProfile copyWith({
     String? id,
     String? name,
@@ -37,7 +46,8 @@ class ConnectionProfile {
     int? relayPort,
     String? deviceId,
     String? sessionId,
-    String? token,
+    String? relayApiKey,
+    String? password,
     String? username,
     bool? useTls,
     bool? allowBadCertificate,
@@ -50,7 +60,8 @@ class ConnectionProfile {
       relayPort: relayPort ?? this.relayPort,
       deviceId: deviceId ?? this.deviceId,
       sessionId: sessionId ?? this.sessionId,
-      token: token ?? this.token,
+      relayApiKey: relayApiKey ?? this.relayApiKey,
+      password: password ?? this.password,
       username: username ?? this.username,
       useTls: useTls ?? this.useTls,
       allowBadCertificate: allowBadCertificate ?? this.allowBadCertificate,
@@ -66,7 +77,8 @@ class ConnectionProfile {
       'relayPort': relayPort,
       'deviceId': deviceId,
       'sessionId': sessionId,
-      'token': token,
+      'relayApiKey': relayApiKey,
+      'password': password,
       'username': username,
       'useTls': useTls,
       'allowBadCertificate': allowBadCertificate,
@@ -82,7 +94,8 @@ class ConnectionProfile {
       relayPort: json['relayPort'] as int,
       deviceId: json['deviceId'] as String,
       sessionId: json['sessionId'] as String,
-      token: json['token'] as String,
+      relayApiKey: json['relayApiKey'] as String,
+      password: json['password'] as String,
       username: json['username'] as String,
       useTls: json['useTls'] as bool,
       allowBadCertificate: json['allowBadCertificate'] as bool,

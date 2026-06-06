@@ -4,7 +4,7 @@ class ServiceGroup {
     required this.name,
     required this.relayHost,
     required this.relayPort,
-    required this.token,
+    required this.relayApiKey,
     required this.useTls,
     required this.allowBadCertificate,
     required this.updatedAt,
@@ -14,7 +14,7 @@ class ServiceGroup {
   final String name;
   final String relayHost;
   final int relayPort;
-  final String token;
+  final String relayApiKey;
   final bool useTls;
   final bool allowBadCertificate;
   final DateTime updatedAt;
@@ -24,7 +24,7 @@ class ServiceGroup {
     String? name,
     String? relayHost,
     int? relayPort,
-    String? token,
+    String? relayApiKey,
     bool? useTls,
     bool? allowBadCertificate,
     DateTime? updatedAt,
@@ -34,7 +34,7 @@ class ServiceGroup {
       name: name ?? this.name,
       relayHost: relayHost ?? this.relayHost,
       relayPort: relayPort ?? this.relayPort,
-      token: token ?? this.token,
+      relayApiKey: relayApiKey ?? this.relayApiKey,
       useTls: useTls ?? this.useTls,
       allowBadCertificate: allowBadCertificate ?? this.allowBadCertificate,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -47,7 +47,7 @@ class ServiceGroup {
       'name': name,
       'relayHost': relayHost,
       'relayPort': relayPort,
-      'token': token,
+      'relayApiKey': relayApiKey,
       'useTls': useTls,
       'allowBadCertificate': allowBadCertificate,
       'updatedAt': updatedAt.toIso8601String(),
@@ -60,7 +60,7 @@ class ServiceGroup {
       name: json['name'] as String,
       relayHost: json['relayHost'] as String,
       relayPort: json['relayPort'] as int,
-      token: json['token'] as String,
+      relayApiKey: json['relayApiKey'] as String,
       useTls: json['useTls'] as bool,
       allowBadCertificate: json['allowBadCertificate'] as bool,
       updatedAt: DateTime.parse(json['updatedAt'] as String),

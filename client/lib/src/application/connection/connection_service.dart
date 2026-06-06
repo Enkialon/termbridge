@@ -13,7 +13,8 @@ class ConnectionService {
   ConnectionProfile createProfile() => _profiles.createProfile();
 
   Future<ConnectionProfile> save(ConnectionProfile profile) async {
-    await _profiles.save(profile);
-    return profile;
+    final saved = profile.ensureSessionId();
+    await _profiles.save(saved);
+    return saved;
   }
 }

@@ -27,8 +27,8 @@ pub struct ControlMessage {
     pub device_id: Option<String>,
     #[serde(rename = "sessionId", skip_serializing_if = "Option::is_none")]
     pub session_id: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub token: Option<String>,
+    #[serde(rename = "relayApiKey", skip_serializing_if = "Option::is_none")]
+    pub relay_api_key: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub message: Option<String>,
 }
@@ -39,7 +39,7 @@ impl ControlMessage {
             message_type: MessageType::AgentRegister,
             device_id: Some(config.device_id.clone()),
             session_id: None,
-            token: Some(config.token.clone()),
+            relay_api_key: Some(config.relay_api_key.clone()),
             message: None,
         }
     }
@@ -49,7 +49,7 @@ impl ControlMessage {
             message_type: MessageType::ClientConnect,
             device_id: Some(profile.device_id.clone()),
             session_id: Some(profile.session_id.clone()),
-            token: Some(profile.token.clone()),
+            relay_api_key: Some(profile.relay_api_key.clone()),
             message: None,
         }
     }

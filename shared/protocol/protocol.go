@@ -30,7 +30,7 @@ type ControlMessage struct {
 	Type         string       `json:"type"`
 	DeviceID     string       `json:"deviceId,omitempty"`
 	SessionID    string       `json:"sessionId,omitempty"`
-	Token        string       `json:"token,omitempty"`
+	RelayAPIKey  string       `json:"relayApiKey,omitempty"`
 	Transports   []string     `json:"transports,omitempty"`
 	Capabilities []string     `json:"capabilities,omitempty"`
 	Plugins      []PluginInfo `json:"plugins,omitempty"`

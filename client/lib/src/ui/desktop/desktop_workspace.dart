@@ -319,8 +319,10 @@ class _AgentPaneState extends State<_AgentPane> {
   final _formKey = GlobalKey<FormState>();
   final _deviceId = TextEditingController();
   final _shell = TextEditingController();
+  final _password = TextEditingController();
   var _groups = <ServiceGroup>[];
   String? _selectedGroupId;
+  var _showPassword = false;
   var _busy = false;
   var _loaded = false;
 
@@ -340,6 +342,7 @@ class _AgentPaneState extends State<_AgentPane> {
     setState(() {
       _deviceId.text = state.settings.deviceId;
       _shell.text = state.settings.shell;
+      _password.text = state.settings.password;
       _groups = state.groups;
       _selectedGroupId = selectedGroupId;
       _loaded = true;
@@ -350,6 +353,7 @@ class _AgentPaneState extends State<_AgentPane> {
   void dispose() {
     _deviceId.dispose();
     _shell.dispose();
+    _password.dispose();
     super.dispose();
   }
 
@@ -358,6 +362,7 @@ class _AgentPaneState extends State<_AgentPane> {
     return AgentSettings(
       deviceId: _deviceId.text.trim(),
       shell: _shell.text.trim(),
+      password: _password.text,
       serviceGroupId: _selectedGroupId,
     );
   }
@@ -453,6 +458,26 @@ class _AgentPaneState extends State<_AgentPane> {
                   const SizedBox(height: 18),
                   _field(_deviceId, '设备 ID', Icons.computer_outlined),
                   _field(_shell, 'Shell', Icons.terminal_outlined),
+                  _field(
+                    _password,
+                    'SSH 密码',
+                    Icons.password_outlined,
+                    obscureText: !_showPassword,
+                    validator: (_) => null,
+                    suffixIcon: IconButton(
+                      tooltip: _showPassword ? '隐藏 SSH 密码' : '显示 SSH 密码',
+                      onPressed: () {
+                        setState(
+                          () => _showPassword = !_showPassword,
+                        );
+                      },
+                      icon: Icon(
+                        _showPassword
+                            ? Icons.visibility_off_outlined
+                            : Icons.visibility_outlined,
+                      ),
+                    ),
+                  ),
                   const SizedBox(height: 6),
                   Text('中继服务器', style: Theme.of(context).textTheme.titleSmall),
                   const SizedBox(height: 8),
@@ -570,12 +595,12 @@ class _RelayPaneState extends State<_RelayPane> {
   final _name = TextEditingController();
   final _host = TextEditingController();
   final _port = TextEditingController();
-  final _token = TextEditingController();
+  final _relayApiKey = TextEditingController();
   var _groups = <ServiceGroup>[];
   ServiceGroup? _selected;
   var _useTls = false;
   var _allowBadCertificate = false;
-  var _showToken = false;
+  var _showRelayApiKey = false;
   var _loaded = false;
 
   @override
@@ -600,7 +625,7 @@ class _RelayPaneState extends State<_RelayPane> {
       _name.clear();
       _host.clear();
       _port.clear();
-      _token.clear();
+      _relayApiKey.clear();
       _useTls = false;
       _allowBadCertificate = false;
     });
@@ -612,7 +637,7 @@ class _RelayPaneState extends State<_RelayPane> {
       _name.text = group.name;
       _host.text = group.relayHost;
       _port.text = group.relayPort.toString();
-      _token.text = group.token;
+      _relayApiKey.text = group.relayApiKey;
       _useTls = group.useTls;
       _allowBadCertificate = group.allowBadCertificate;
     });
@@ -626,7 +651,7 @@ class _RelayPaneState extends State<_RelayPane> {
         name: _name.text.trim(),
         host: _host.text.trim(),
         port: int.parse(_port.text.trim()),
-        token: _token.text,
+        relayApiKey: _relayApiKey.text,
         useTls: _useTls,
         allowBadCertificate: _allowBadCertificate,
       ),
@@ -663,7 +688,7 @@ class _RelayPaneState extends State<_RelayPane> {
     _name.dispose();
     _host.dispose();
     _port.dispose();
-    _token.dispose();
+    _relayApiKey.dispose();
     super.dispose();
   }
 
@@ -778,17 +803,17 @@ class _RelayPaneState extends State<_RelayPane> {
                       ],
                     ),
                     _field(
-                      _token,
-                      'Token',
+                      _relayApiKey,
+                      'Relay API Key',
                       Icons.key_outlined,
-                      obscureText: !_showToken,
+                      obscureText: !_showRelayApiKey,
                       suffixIcon: IconButton(
-                        tooltip: _showToken ? '隐藏 Token' : '显示 Token',
+                        tooltip: _showRelayApiKey ? '隐藏 API Key' : '显示 API Key',
                         onPressed: () {
-                          setState(() => _showToken = !_showToken);
+                          setState(() => _showRelayApiKey = !_showRelayApiKey);
                         },
                         icon: Icon(
-                          _showToken
+                          _showRelayApiKey
                               ? Icons.visibility_off_outlined
                               : Icons.visibility_outlined,
                         ),
@@ -818,16 +843,28 @@ class _RelayPaneState extends State<_RelayPane> {
                           : null,
                     ),
                     const SizedBox(height: 14),
-                    FilledButton.icon(
-                      onPressed: _save,
-                      icon: const Icon(Icons.save_outlined),
-                      label: const Text('保存'),
-                    ),
-                    const SizedBox(height: 10),
-                    OutlinedButton.icon(
-                      onPressed: _selected == null ? null : _setAsAgentRelay,
-                      icon: const Icon(Icons.devices_outlined),
-                      label: const Text('设为本机中继服务器'),
+                    Row(
+                      children: [
+                        FilledButton.icon(
+                          onPressed: _save,
+                          icon: const Icon(Icons.save_outlined),
+                          label: const Text('保存'),
+                        ),
+                        const SizedBox(width: 10),
+                        Flexible(
+                          child: OutlinedButton.icon(
+                            onPressed:
+                                _selected == null ? null : _setAsAgentRelay,
+                            icon: const Icon(Icons.devices_outlined),
+                            label: const Text(
+                              '设为本机中继服务器',
+                              maxLines: 1,
+                              softWrap: false,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),

@@ -15,7 +15,7 @@ import (
 )
 
 type relayServer struct {
-	token string
+	relayAPIKey string
 
 	mu       sync.Mutex
 	agents   map[string]*agentConn
@@ -39,15 +39,15 @@ type pendingSession struct {
 
 func main() {
 	addr := flag.String("addr", ":8080", "TCP listen address")
-	token := flag.String("token", "", "shared relay token; empty disables relay auth")
+	relayAPIKey := flag.String("relay-api-key", "", "shared relay API key; empty disables relay auth")
 	tlsCert := flag.String("tls-cert", "", "TLS certificate file; requires -tls-key")
 	tlsKey := flag.String("tls-key", "", "TLS private key file; requires -tls-cert")
 	flag.Parse()
 
 	s := &relayServer{
-		token:    *token,
-		agents:   make(map[string]*agentConn),
-		sessions: make(map[string]*pendingSession),
+		relayAPIKey: *relayAPIKey,
+		agents:      make(map[string]*agentConn),
+		sessions:    make(map[string]*pendingSession),
 	}
 
 	ln, err := listen(*addr, *tlsCert, *tlsKey)
@@ -98,7 +98,7 @@ func (s *relayServer) handleConn(conn net.Conn) {
 		return
 	}
 
-	if !s.authorized(msg.Token) {
+	if !s.authorized(msg.RelayAPIKey) {
 		_ = shared.WriteError(conn, "unauthorized")
 		_ = conn.Close()
 		return
@@ -300,8 +300,8 @@ func (s *relayServer) removeAgent(agent *agentConn) {
 	}
 }
 
-func (s *relayServer) authorized(token string) bool {
-	return s.token == "" || token == s.token
+func (s *relayServer) authorized(relayAPIKey string) bool {
+	return s.relayAPIKey == "" || relayAPIKey == s.relayAPIKey
 }
 
 func sessionKey(deviceID, sessionID string) string {

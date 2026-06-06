@@ -14,7 +14,8 @@ pub struct AgentConfig {
     pub relay_host: String,
     pub relay_port: u16,
     pub device_id: String,
-    pub token: String,
+    pub relay_api_key: String,
+    pub password: String,
     pub shell: String,
     pub use_tls: bool,
     pub allow_bad_certificate: bool,
@@ -114,7 +115,11 @@ async fn run_agent_once(
         result = run_pty_ssh_server(
             tunnel,
             SshServerConfig {
-                password: Some(config.token),
+                password: if config.password.is_empty() {
+                    None
+                } else {
+                    Some(config.password)
+                },
                 shell: Some(config.shell),
             },
         ) => {

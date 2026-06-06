@@ -8,7 +8,7 @@ class RelayConfigInput {
     required this.name,
     required this.host,
     required this.port,
-    required this.token,
+    required this.relayApiKey,
     required this.useTls,
     required this.allowBadCertificate,
   });
@@ -17,7 +17,7 @@ class RelayConfigInput {
   final String name;
   final String host;
   final int port;
-  final String token;
+  final String relayApiKey;
   final bool useTls;
   final bool allowBadCertificate;
 }
@@ -41,7 +41,7 @@ class RelayService {
       name: input.name,
       relayHost: input.host,
       relayPort: input.port,
-      token: input.token,
+      relayApiKey: input.relayApiKey,
       useTls: input.useTls,
       allowBadCertificate: input.useTls && input.allowBadCertificate,
       updatedAt: DateTime.now(),

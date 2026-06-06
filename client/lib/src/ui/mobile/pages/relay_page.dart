@@ -119,10 +119,10 @@ class _RelayEditorPageState extends State<RelayEditorPage> {
   final _name = TextEditingController();
   final _host = TextEditingController();
   final _port = TextEditingController();
-  final _token = TextEditingController();
+  final _relayApiKey = TextEditingController();
   var _useTls = false;
   var _allowBadCertificate = false;
-  var _showToken = false;
+  var _showRelayApiKey = false;
   var _saving = false;
 
   @override
@@ -132,7 +132,7 @@ class _RelayEditorPageState extends State<RelayEditorPage> {
     _name.text = group?.name ?? '';
     _host.text = group?.relayHost ?? '';
     _port.text = group == null ? '' : group.relayPort.toString();
-    _token.text = group?.token ?? '';
+    _relayApiKey.text = group?.relayApiKey ?? '';
     _useTls = group?.useTls ?? false;
     _allowBadCertificate = group?.allowBadCertificate ?? false;
   }
@@ -142,7 +142,7 @@ class _RelayEditorPageState extends State<RelayEditorPage> {
     _name.dispose();
     _host.dispose();
     _port.dispose();
-    _token.dispose();
+    _relayApiKey.dispose();
     super.dispose();
   }
 
@@ -156,7 +156,7 @@ class _RelayEditorPageState extends State<RelayEditorPage> {
           name: _name.text.trim(),
           host: _host.text.trim(),
           port: int.parse(_port.text.trim()),
-          token: _token.text,
+          relayApiKey: _relayApiKey.text,
           useTls: _useTls,
           allowBadCertificate: _allowBadCertificate,
         ),
@@ -197,17 +197,17 @@ class _RelayEditorPageState extends State<RelayEditorPage> {
                     validator: _validatePort,
                   ),
                   _field(
-                    _token,
-                    'Token',
+                    _relayApiKey,
+                    'Relay API Key',
                     Icons.key_outlined,
-                    obscureText: !_showToken,
+                    obscureText: !_showRelayApiKey,
                     suffixIcon: IconButton(
-                      tooltip: _showToken ? '隐藏 Token' : '显示 Token',
+                      tooltip: _showRelayApiKey ? '隐藏 API Key' : '显示 API Key',
                       onPressed: () {
-                        setState(() => _showToken = !_showToken);
+                        setState(() => _showRelayApiKey = !_showRelayApiKey);
                       },
                       icon: Icon(
-                        _showToken
+                        _showRelayApiKey
                             ? Icons.visibility_off_outlined
                             : Icons.visibility_outlined,
                       ),
