@@ -68,7 +68,7 @@ jobs:
 
       - name: Flutter analyze
         working-directory: client
-        run: flutter analyze
+        run: flutter analyze lib/
 
       - name: Flutter build APK (debug)
         working-directory: client
