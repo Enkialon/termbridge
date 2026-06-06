@@ -85,8 +85,11 @@ where
         .await
         .context("failed to request SSH shell")?;
 
-    let (input_tx, mut input_rx) = mpsc::channel::<ShellInput>(128);
-    let (output_tx, output_rx) = mpsc::channel::<Vec<u8>>(128);
+    // Use a larger channel so the SSH reader task isn't blocked
+    // while waiting for the Dart side to drain chunks via FFI.
+    const CHAN_CAPACITY: usize = 256;
+    let (input_tx, mut input_rx) = mpsc::channel::<ShellInput>(CHAN_CAPACITY);
+    let (output_tx, output_rx) = mpsc::channel::<Vec<u8>>(CHAN_CAPACITY);
 
     tokio::spawn(async move {
         loop {
@@ -161,6 +164,27 @@ impl RemoteShell {
     }
 
     pub async fn next_output(&self) -> Option<Vec<u8>> {
-        self.output.lock().await.recv().await
+        let mut output = self.output.lock().await;
+        let mut result = output.recv().await?;
+
+        // Drain any additional chunks that are already queued.
+        // Coalescing reduces FFI round-trips and gives the xterm
+        // parser larger, more coherent input — especially important
+        // on mobile where TCP segments are fragmented.
+        loop {
+            match output.try_recv() {
+                Ok(more) => {
+                    result.extend_from_slice(&more);
+                    // Cap to avoid one enormous allocation; 64 KiB is
+                    // more than enough for a single terminal frame.
+                    if result.len() > 65536 {
+                        break;
+                    }
+                }
+                Err(_) => break,
+            }
+        }
+
+        Some(result)
     }
 }

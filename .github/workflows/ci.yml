@@ -60,6 +60,12 @@ jobs:
         working-directory: client
         run: flutter pub get
 
+      - name: Flutter Rust Bridge codegen
+        working-directory: client
+        run: |
+          cargo install flutter_rust_bridge_codegen --locked
+          flutter_rust_bridge_codegen generate
+
       - name: Flutter analyze
         working-directory: client
         run: flutter analyze
