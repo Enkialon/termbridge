@@ -565,7 +565,7 @@ class _AgentPaneState extends State<_AgentPane> {
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 12),
                         child: DropdownButtonFormField<String>(
-                          value: groups.any((g) => g.id == _selectedGroupId)
+                          initialValue: groups.any((g) => g.id == _selectedGroupId)
                               ? _selectedGroupId
                               : null,
                           decoration: const InputDecoration(

@@ -202,7 +202,7 @@ class _AgentPageState extends State<AgentPage> {
                           return Padding(
                             padding: const EdgeInsets.only(bottom: 12),
                             child: DropdownButtonFormField<String>(
-                              value: groups.any((g) => g.id == _selectedGroupId)
+                              initialValue: groups.any((g) => g.id == _selectedGroupId)
                                   ? _selectedGroupId
                                   : null,
                               decoration: const InputDecoration(
