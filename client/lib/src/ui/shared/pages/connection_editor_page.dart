@@ -33,19 +33,13 @@ class _ConnectionEditorPageState extends State<ConnectionEditorPage> {
   final _formKey = GlobalKey<FormState>();
 
   late final TextEditingController _name;
-  late final TextEditingController _host;
-  late final TextEditingController _port;
   late final TextEditingController _deviceId;
   late final TextEditingController _sessionId;
-  late final TextEditingController _relayApiKey;
   late final TextEditingController _password;
   late final TextEditingController _username;
 
-  late bool _useTls;
-  late bool _allowBadCertificate;
   var _serviceGroups = <ServiceGroup>[];
   String? _selectedServiceGroupId;
-  bool _showRelayApiKey = false;
   bool _showPassword = false;
   bool _saving = false;
 
@@ -54,17 +48,10 @@ class _ConnectionEditorPageState extends State<ConnectionEditorPage> {
     super.initState();
     final profile = widget.profile;
     _name = TextEditingController(text: profile.name);
-    _host = TextEditingController(text: profile.relayHost);
-    _port = TextEditingController(
-      text: profile.relayPort <= 0 ? '' : profile.relayPort.toString(),
-    );
     _deviceId = TextEditingController(text: profile.deviceId);
     _sessionId = TextEditingController(text: profile.sessionId);
-    _relayApiKey = TextEditingController(text: profile.relayApiKey);
     _password = TextEditingController(text: profile.password);
     _username = TextEditingController(text: profile.username);
-    _useTls = profile.useTls;
-    _allowBadCertificate = profile.allowBadCertificate;
     _loadServiceGroups();
   }
 
@@ -72,10 +59,9 @@ class _ConnectionEditorPageState extends State<ConnectionEditorPage> {
     final groups = await widget.relayService.loadAll();
     if (!mounted) return;
     String? selectedGroupId;
-    final relayPort = int.tryParse(_port.text.trim());
     for (final group in groups) {
-      if (group.relayHost == _host.text.trim() &&
-          group.relayPort == relayPort) {
+      if (group.relayHost == widget.profile.relayHost &&
+          group.relayPort == widget.profile.relayPort) {
         selectedGroupId = group.id;
         break;
       }
@@ -89,11 +75,8 @@ class _ConnectionEditorPageState extends State<ConnectionEditorPage> {
   @override
   void dispose() {
     _name.dispose();
-    _host.dispose();
-    _port.dispose();
     _deviceId.dispose();
     _sessionId.dispose();
-    _relayApiKey.dispose();
     _password.dispose();
     _username.dispose();
     super.dispose();
@@ -101,17 +84,24 @@ class _ConnectionEditorPageState extends State<ConnectionEditorPage> {
 
   ConnectionProfile? _profileFromForm() {
     if (!_formKey.currentState!.validate()) return null;
+    final group = _selectedServiceGroup;
+    if (group == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('请选择一个中继服务器')),
+      );
+      return null;
+    }
     return widget.profile.copyWith(
       name: _name.text.trim(),
-      relayHost: _host.text.trim(),
-      relayPort: int.parse(_port.text.trim()),
+      relayHost: group.relayHost,
+      relayPort: group.relayPort,
       deviceId: _deviceId.text.trim(),
       sessionId: _sessionId.text.trim(),
-      relayApiKey: _relayApiKey.text,
+      relayApiKey: group.relayApiKey,
       password: _password.text,
       username: _username.text.trim(),
-      useTls: _useTls,
-      allowBadCertificate: _useTls && _allowBadCertificate,
+      useTls: group.useTls,
+      allowBadCertificate: group.allowBadCertificate,
     );
   }
 
@@ -147,51 +137,17 @@ class _ConnectionEditorPageState extends State<ConnectionEditorPage> {
     );
   }
 
-  Future<void> _saveCurrentServiceGroup() async {
-    final port = int.tryParse(_port.text.trim());
-    if (_host.text.trim().isEmpty || port == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('请先填写服务器地址和端口')),
-      );
-      return;
-    }
-
-    await widget.relayService.save(
-      RelayConfigInput(
-        selected: null,
-        name: '${_host.text.trim()}:$port',
-        host: _host.text.trim(),
-        port: port,
-        relayApiKey: _relayApiKey.text,
-        useTls: _useTls,
-        allowBadCertificate: _allowBadCertificate,
-      ),
-    );
-    await _loadServiceGroups();
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('中继服务器已保存')),
-      );
-    }
-  }
-
   void _applyServiceGroup(String? id) {
-    ServiceGroup? group;
-    for (final value in _serviceGroups) {
-      if (value.id == id) {
-        group = value;
-        break;
-      }
-    }
-    if (group == null) return;
     setState(() {
       _selectedServiceGroupId = id;
-      _host.text = group!.relayHost;
-      _port.text = group.relayPort.toString();
-      _relayApiKey.text = group.relayApiKey;
-      _useTls = group.useTls;
-      _allowBadCertificate = group.allowBadCertificate;
     });
+  }
+
+  ServiceGroup? get _selectedServiceGroup {
+    for (final group in _serviceGroups) {
+      if (group.id == _selectedServiceGroupId) return group;
+    }
+    return null;
   }
 
   @override
@@ -215,7 +171,12 @@ class _ConnectionEditorPageState extends State<ConnectionEditorPage> {
               _Section(
                 title: '接入服务器',
                 children: [
-                  if (_serviceGroups.isNotEmpty)
+                  if (_serviceGroups.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.only(bottom: 12),
+                      child: Text('请先在“中继服务器”里添加服务器'),
+                    )
+                  else
                     Padding(
                       padding: const EdgeInsets.only(bottom: 12),
                       child: DropdownButtonFormField<String>(
@@ -236,47 +197,14 @@ class _ConnectionEditorPageState extends State<ConnectionEditorPage> {
                             )
                             .toList(),
                         onChanged: _applyServiceGroup,
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return '请选择一个中继服务器';
+                          }
+                          return null;
+                        },
                       ),
                     ),
-                  _field(_host, '服务器地址', Icons.dns_outlined),
-                  _field(
-                    _port,
-                    '端口',
-                    Icons.numbers,
-                    keyboardType: TextInputType.number,
-                    validator: _validatePort,
-                  ),
-                  SwitchListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: const Text('TLS'),
-                    secondary: const Icon(Icons.lock_outline),
-                    value: _useTls,
-                    onChanged: (value) {
-                      setState(() {
-                        _useTls = value;
-                        if (!value) _allowBadCertificate = false;
-                      });
-                    },
-                  ),
-                  SwitchListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: const Text('允许不安全证书'),
-                    secondary: const Icon(Icons.warning_amber_outlined),
-                    value: _allowBadCertificate,
-                    onChanged: _useTls
-                        ? (value) {
-                            setState(() => _allowBadCertificate = value);
-                          }
-                        : null,
-                  ),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: TextButton.icon(
-                      onPressed: _saveCurrentServiceGroup,
-                      icon: const Icon(Icons.bookmark_add_outlined),
-                      label: const Text('保存为中继服务器'),
-                    ),
-                  ),
                 ],
               ),
               _Section(
@@ -289,17 +217,18 @@ class _ConnectionEditorPageState extends State<ConnectionEditorPage> {
                 title: '认证',
                 children: [
                   _field(
-                    _relayApiKey,
-                    'Relay API Key',
-                    Icons.key_outlined,
-                    obscureText: !_showRelayApiKey,
+                    _password,
+                    'SSH 密码',
+                    Icons.password_outlined,
+                    obscureText: !_showPassword,
+                    validator: (_) => null,
                     suffixIcon: IconButton(
-                      tooltip: _showRelayApiKey ? '隐藏 API Key' : '显示 API Key',
+                      tooltip: _showPassword ? '隐藏 SSH 密码' : '显示 SSH 密码',
                       onPressed: () {
-                        setState(() => _showRelayApiKey = !_showRelayApiKey);
+                        setState(() => _showPassword = !_showPassword);
                       },
                       icon: Icon(
-                        _showRelayApiKey
+                        _showPassword
                             ? Icons.visibility_off_outlined
                             : Icons.visibility_outlined,
                       ),
@@ -323,24 +252,6 @@ class _ConnectionEditorPageState extends State<ConnectionEditorPage> {
                     '会话 ID',
                     Icons.tag_outlined,
                     validator: (_) => null,
-                  ),
-                  _field(
-                    _password,
-                    'SSH 密码',
-                    Icons.password_outlined,
-                    obscureText: !_showPassword,
-                    validator: (_) => null,
-                    suffixIcon: IconButton(
-                      tooltip: _showPassword ? '隐藏 SSH 密码' : '显示 SSH 密码',
-                      onPressed: () {
-                        setState(() => _showPassword = !_showPassword);
-                      },
-                      icon: Icon(
-                        _showPassword
-                            ? Icons.visibility_off_outlined
-                            : Icons.visibility_outlined,
-                      ),
-                    ),
                   ),
                   _field(
                     _username,
@@ -381,14 +292,6 @@ class _ConnectionEditorPageState extends State<ConnectionEditorPage> {
         ),
       ),
     );
-  }
-
-  String? _validatePort(String? value) {
-    final port = int.tryParse(value ?? '');
-    if (port == null || port <= 0 || port > 65535) {
-      return '请输入 1-65535';
-    }
-    return null;
   }
 
   Widget _field(
