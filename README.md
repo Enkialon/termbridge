@@ -69,8 +69,20 @@ termbridge/
 #### 1. Build & run the relay server
 
 ```powershell
-# Build
+# Build (Windows binary)
 go -C server build -o bin\relay.exe .\cmd\relay
+
+# Cross-compile for Linux x64
+$env:GOOS = "linux"; $env:GOARCH = "amd64"; go -C server build -o bin\relay .\cmd\relay
+
+# Cross-compile for Linux ARM64 (e.g. Raspberry Pi, cloud)
+$env:GOOS = "linux"; $env:GOARCH = "arm64"; go -C server build -o bin\relay_arm64 .\cmd\relay
+
+# Cross-compile for macOS (Intel)
+$env:GOOS = "darwin"; $env:GOARCH = "amd64"; go -C server build -o bin\relay_darwin .\cmd\relay
+
+# Cross-compile for macOS (Apple Silicon)
+$env:GOOS = "darwin"; $env:GOARCH = "arm64"; go -C server build -o bin\relay_darwin_arm .\cmd\relay
 
 # Run (development mode — use a shared token)
 .\server\bin\relay.exe -addr :8080 -token dev-token
@@ -233,8 +245,20 @@ termbridge/
 #### 1. 编译并启动 Relay 服务器
 
 ```powershell
-# 编译
+# 编译（Windows 二进制）
 go -C server build -o bin\relay.exe .\cmd\relay
+
+# 交叉编译 Linux x64
+$env:GOOS = "linux"; $env:GOARCH = "amd64"; go -C server build -o bin\relay .\cmd\relay
+
+# 交叉编译 Linux ARM64（树莓派/云服务器）
+$env:GOOS = "linux"; $env:GOARCH = "arm64"; go -C server build -o bin\relay_arm64 .\cmd\relay
+
+# 交叉编译 macOS（Intel）
+$env:GOOS = "darwin"; $env:GOARCH = "amd64"; go -C server build -o bin\relay_darwin .\cmd\relay
+
+# 交叉编译 macOS（Apple Silicon）
+$env:GOOS = "darwin"; $env:GOARCH = "arm64"; go -C server build -o bin\relay_darwin_arm .\cmd\relay
 
 # 启动（开发模式 — 使用共享 token）
 .\server\bin\relay.exe -addr :8080 -token dev-token
