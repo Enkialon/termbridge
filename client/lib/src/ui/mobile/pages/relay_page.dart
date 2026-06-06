@@ -37,6 +37,31 @@ class _RelayPageState extends State<RelayPage> {
     if (saved == true) _reload();
   }
 
+  Future<void> _delete(RelayConfig group) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('删除中继服务器'),
+          content: Text('确定删除"${group.name}"吗？'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('删除'),
+            ),
+          ],
+        );
+      },
+    );
+    if (confirmed != true) return;
+    await widget.service.delete(group.id);
+    _reload();
+  }
+
   Future<void> _test(RelayConfig group) async {
     if (_testing.contains(group.id)) return;
     setState(() => _testing.add(group.id));
@@ -100,7 +125,7 @@ class _RelayPageState extends State<RelayPage> {
                     borderRadius: BorderRadius.circular(8),
                     onTap: () => _openEditor(group),
                     child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 12, 10, 12),
+                      padding: const EdgeInsets.fromLTRB(16, 12, 4, 12),
                       child: Row(
                         children: [
                           const Icon(Icons.hub_outlined),
@@ -128,11 +153,16 @@ class _RelayPageState extends State<RelayPage> {
                               ],
                             ),
                           ),
-                          const SizedBox(width: 8),
+                          const SizedBox(width: 4),
                           _RelayTestButton(
                             group: group,
                             testing: _testing.contains(group.id),
                             onPressed: () => _test(group),
+                          ),
+                          IconButton(
+                            tooltip: '删除中继服务器',
+                            onPressed: () => _delete(group),
+                            icon: const Icon(Icons.delete_outline, size: 20),
                           ),
                           const Icon(Icons.chevron_right),
                         ],

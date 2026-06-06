@@ -163,6 +163,8 @@ class RelayService {
     }
   }
 
+  Future<void> delete(String id) => _relayConfigs.delete(id);
+
   Future<void> setAsAgentRelay(RelayConfig relayConfig) async {
     final settings = await _agentSettings.load();
     await _agentSettings.save(

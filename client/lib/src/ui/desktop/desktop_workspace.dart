@@ -675,29 +675,36 @@ class _RelayPaneState extends State<_RelayPane> {
   final _host = TextEditingController();
   final _port = TextEditingController();
   final _relayApiKey = TextEditingController();
-  var _groups = <RelayConfig>[];
+  late Future<List<RelayConfig>> _groupsFuture;
   RelayConfig? _selected;
   final _testing = <String>{};
   var _useTls = false;
   var _allowBadCertificate = false;
   var _showRelayApiKey = false;
-  var _loaded = false;
   var _saving = false;
 
   @override
   void initState() {
     super.initState();
-    _load();
+    _groupsFuture = _load();
   }
 
-  Future<void> _load() async {
+  Future<List<RelayConfig>> _load() async {
     final groups = await widget.service.loadAll();
-    if (!mounted) return;
+    if (!mounted) return [];
+    if (_selected != null) {
+      final fresh = groups.where((g) => g.id == _selected!.id);
+      if (fresh.isNotEmpty) _select(fresh.first);
+    } else if (groups.isNotEmpty) {
+      _select(groups.first);
+    }
+    return groups;
+  }
+
+  void _reloadGroups() {
     setState(() {
-      _groups = groups;
-      _loaded = true;
+      _groupsFuture = _load();
     });
-    if (groups.isNotEmpty) _select(groups.first);
   }
 
   void _create() {
@@ -739,8 +746,9 @@ class _RelayPaneState extends State<_RelayPane> {
           allowBadCertificate: _allowBadCertificate,
         ),
       );
-      await _load();
-      final reloaded = _groups.where((group) => group.id == saved.id);
+      _reloadGroups();
+      final groups = await _groupsFuture;
+      final reloaded = groups.where((group) => group.id == saved.id);
       if (reloaded.isNotEmpty) _select(reloaded.first);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -758,19 +766,49 @@ class _RelayPaneState extends State<_RelayPane> {
     try {
       final tested = await widget.service.test(group);
       if (!mounted) return;
-      setState(() {
-        _groups = _groups
-            .map((value) => value.id == tested.id ? tested : value)
-            .toList();
-        if (_selected?.id == tested.id) {
-          _selected = tested;
-        }
-      });
+      _reloadGroups();
+      if (_selected?.id == tested.id) {
+        _selected = tested;
+      }
     } finally {
       if (mounted) {
         setState(() => _testing.remove(group.id));
       }
     }
+  }
+
+  Future<void> _delete(RelayConfig group) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('删除中继服务器'),
+          content: Text('确定删除"${group.name}"吗？'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('删除'),
+            ),
+          ],
+        );
+      },
+    );
+    if (confirmed != true) return;
+
+    await widget.service.delete(group.id);
+    if (!mounted) return;
+    if (_selected?.id == group.id) {
+      _selected = null;
+      _name.clear();
+      _host.clear();
+      _port.clear();
+      _relayApiKey.clear();
+    }
+    _reloadGroups();
   }
 
   Future<void> _setAsAgentRelay() async {
@@ -801,112 +839,121 @@ class _RelayPaneState extends State<_RelayPane> {
 
   @override
   Widget build(BuildContext context) {
-    if (!_loaded) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    return Row(
-      children: [
-        SizedBox(
-          width: 320,
-          child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 12, 8),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        '中继服务器',
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                    ),
-                    IconButton(
-                      tooltip: '新建中继服务器',
-                      onPressed: _create,
-                      icon: const Icon(Icons.add),
-                    ),
-                  ],
-                ),
-              ),
-              Expanded(
-                child: _groups.isEmpty
-                    ? Center(
-                        child: FilledButton.icon(
+    return FutureBuilder<List<RelayConfig>>(
+      future: _groupsFuture,
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        final groups = snapshot.data!;
+        return Row(
+          children: [
+            SizedBox(
+              width: 320,
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 12, 8),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            '中继服务器',
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
+                        ),
+                        IconButton(
+                          tooltip: '新建中继服务器',
                           onPressed: _create,
                           icon: const Icon(Icons.add),
-                          label: const Text('新建中继服务器'),
                         ),
-                      )
-                    : ListView.separated(
-                        padding: const EdgeInsets.fromLTRB(10, 0, 10, 12),
-                        itemCount: _groups.length,
-                        separatorBuilder: (context, index) =>
-                            const SizedBox(height: 6),
-                        itemBuilder: (context, index) {
-                          final group = _groups[index];
-                          final selected = _selected?.id == group.id;
-                          return Material(
-                            color: selected
-                                ? Theme.of(context)
-                                    .colorScheme
-                                    .primaryContainer
-                                    .withValues(alpha: 0.48)
-                                : const Color(0xff11181c),
-                            borderRadius: BorderRadius.circular(8),
-                            child: InkWell(
-                              borderRadius: BorderRadius.circular(8),
-                              onTap: () => _select(group),
-                              child: Padding(
-                                padding:
-                                    const EdgeInsets.fromLTRB(16, 12, 10, 12),
-                                child: Row(
-                                  children: [
-                                    const Icon(Icons.hub_outlined),
-                                    const SizedBox(width: 16),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            group.name.isEmpty
-                                                ? '未命名中继服务器'
-                                                : group.name,
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                          const SizedBox(height: 4),
-                                          Text(
-                                            group.relayHost.isEmpty
-                                                ? '未配置地址'
-                                                : '${group.relayHost}:${group.relayPort}',
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: Theme.of(context)
-                                                .textTheme
-                                                .bodySmall,
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    _RelayTestButton(
-                                      group: group,
-                                      testing: _testing.contains(group.id),
-                                      onPressed: () => _test(group),
-                                    ),
-                                  ],
-                                ),
-                              ),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: groups.isEmpty
+                        ? Center(
+                            child: FilledButton.icon(
+                              onPressed: _create,
+                              icon: const Icon(Icons.add),
+                              label: const Text('新建中继服务器'),
                             ),
-                          );
-                        },
-                      ),
+                          )
+                        : ListView.separated(
+                            padding: const EdgeInsets.fromLTRB(10, 0, 10, 12),
+                            itemCount: groups.length,
+                            separatorBuilder: (context, index) =>
+                                const SizedBox(height: 6),
+                            itemBuilder: (context, index) {
+                              final group = groups[index];
+                              final selected = _selected?.id == group.id;
+                              return Material(
+                                color: selected
+                                    ? Theme.of(context)
+                                        .colorScheme
+                                        .primaryContainer
+                                        .withValues(alpha: 0.48)
+                                    : const Color(0xff11181c),
+                                borderRadius: BorderRadius.circular(8),
+                                child: InkWell(
+                                  borderRadius: BorderRadius.circular(8),
+                                  onTap: () => _select(group),
+                                  child: Padding(
+                                    padding:
+                                        const EdgeInsets.fromLTRB(16, 12, 4, 12),
+                                    child: Row(
+                                      children: [
+                                        const Icon(Icons.hub_outlined),
+                                        const SizedBox(width: 16),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                group.name.isEmpty
+                                                    ? '未命名中继服务器'
+                                                    : group.name,
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                              const SizedBox(height: 4),
+                                              Text(
+                                                group.relayHost.isEmpty
+                                                    ? '未配置地址'
+                                                    : '${group.relayHost}:${group.relayPort}',
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: Theme.of(context)
+                                                    .textTheme
+                                                    .bodySmall,
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        const SizedBox(width: 4),
+                                        _RelayTestButton(
+                                          group: group,
+                                          testing: _testing.contains(group.id),
+                                          onPressed: () => _test(group),
+                                        ),
+                                        IconButton(
+                                          tooltip: '删除中继服务器',
+                                          onPressed: () => _delete(group),
+                                          icon: const Icon(Icons.delete_outline,
+                                              size: 20),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                  ),
+                ],
               ),
-            ],
-          ),
-        ),
+            ),
         const VerticalDivider(width: 1),
         Expanded(
           child: SingleChildScrollView(
@@ -1009,6 +1056,14 @@ class _RelayPaneState extends State<_RelayPane> {
                             ),
                           ),
                         ),
+                        const SizedBox(width: 10),
+                        IconButton.outlined(
+                          tooltip: '删除',
+                          onPressed: _selected == null
+                              ? null
+                              : () => _delete(_selected!),
+                          icon: const Icon(Icons.delete_outline),
+                        ),
                       ],
                     ),
                   ],
@@ -1018,6 +1073,8 @@ class _RelayPaneState extends State<_RelayPane> {
           ),
         ),
       ],
+    );
+      },
     );
   }
 

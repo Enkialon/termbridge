@@ -6,4 +6,6 @@ abstract interface class RelayConfigRepository {
   Future<void> save(RelayConfig relayConfig);
 
   Future<void> saveAll(List<RelayConfig> relayConfigs);
+
+  Future<void> delete(String id);
 }

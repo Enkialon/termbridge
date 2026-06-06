@@ -39,6 +39,13 @@ class SharedPreferencesRelayConfigRepository
   }
 
   @override
+  Future<void> delete(String id) async {
+    final relayConfigs = await loadAll();
+    relayConfigs.removeWhere((value) => value.id == id);
+    await saveAll(relayConfigs);
+  }
+
+  @override
   Future<void> saveAll(List<RelayConfig> relayConfigs) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(
