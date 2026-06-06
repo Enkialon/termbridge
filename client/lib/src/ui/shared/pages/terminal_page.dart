@@ -39,13 +39,25 @@ class _TerminalPageState extends State<TerminalPage> {
   bool _connecting = false;
   bool _connected = false;
   String _status = '未连接';
+  String? _relayLabel;
 
   @override
   void initState() {
     super.initState();
     _terminal.write('TH 远程终端\r\n');
     _terminal.write('正在连接 ${widget.profile.name}...\r\n');
+    unawaited(_loadRelayLabel());
     WidgetsBinding.instance.addPostFrameCallback((_) => _connect());
+  }
+
+  Future<void> _loadRelayLabel() async {
+    try {
+      final relayLabel =
+          await widget.service.describeRelay(widget.profile.relayConfigId);
+      if (mounted) setState(() => _relayLabel = relayLabel);
+    } catch (_) {
+      if (mounted) setState(() => _relayLabel = widget.profile.relayConfigId);
+    }
   }
 
   Future<void> _connect() async {
@@ -170,7 +182,7 @@ class _TerminalPageState extends State<TerminalPage> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '${widget.profile.relayHost}:${widget.profile.relayPort} · '
+                  '${_relayLabel ?? widget.profile.relayConfigId} · '
                   '${widget.profile.deviceId} · ${widget.profile.sessionId}',
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
@@ -234,6 +246,7 @@ class _TerminalPageState extends State<TerminalPage> {
         children: [
           _SessionBar(
             profile: widget.profile,
+            relayLabel: _relayLabel,
             status: _status,
             connecting: _connecting,
             connected: _connected,
@@ -268,6 +281,7 @@ class _TerminalPageState extends State<TerminalPage> {
         children: [
           _EmbeddedTerminalToolbar(
             profile: widget.profile,
+            relayLabel: _relayLabel,
             status: _status,
             connecting: _connecting,
             connected: _connected,
@@ -372,6 +386,7 @@ class _TerminalPageState extends State<TerminalPage> {
 class _EmbeddedTerminalToolbar extends StatelessWidget {
   const _EmbeddedTerminalToolbar({
     required this.profile,
+    required this.relayLabel,
     required this.status,
     required this.connecting,
     required this.connected,
@@ -381,6 +396,7 @@ class _EmbeddedTerminalToolbar extends StatelessWidget {
   });
 
   final ConnectionProfile profile;
+  final String? relayLabel;
   final String status;
   final bool connecting;
   final bool connected;
@@ -410,7 +426,7 @@ class _EmbeddedTerminalToolbar extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                   Text(
-                    status,
+                    relayLabel == null ? status : '$relayLabel · $status',
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                 ],
@@ -441,6 +457,7 @@ class _EmbeddedTerminalToolbar extends StatelessWidget {
 class _SessionBar extends StatelessWidget {
   const _SessionBar({
     required this.profile,
+    required this.relayLabel,
     required this.status,
     required this.connecting,
     required this.connected,
@@ -448,6 +465,7 @@ class _SessionBar extends StatelessWidget {
   });
 
   final ConnectionProfile profile;
+  final String? relayLabel;
   final String status;
   final bool connecting;
   final bool connected;
@@ -473,7 +491,7 @@ class _SessionBar extends StatelessWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  '${profile.relayHost}:${profile.relayPort} · '
+                  '${relayLabel ?? profile.relayConfigId} · '
                   '${profile.deviceId}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,

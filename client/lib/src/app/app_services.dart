@@ -25,7 +25,10 @@ class AppServices {
     final agentSettings = SharedPreferencesAgentSettingsRepository();
     return AppServices(
       connections: ConnectionService(profiles: profiles),
-      terminal: TerminalService(terminalPort: terminalPort),
+      terminal: TerminalService(
+        terminalPort: terminalPort,
+        relayConfigs: relayConfigs,
+      ),
       agent: AgentService(
         runtime: runtime,
         settings: agentSettings,

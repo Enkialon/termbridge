@@ -41,7 +41,7 @@ class GeneratedFrbCoreApi implements FrbCoreApi {
   }
 
   @override
-  Future<int> openTerminal(ConnectionProfile profile) {
+  Future<int> openTerminal(ResolvedConnectionProfile profile) {
     return frb.openTerminal(profile: _terminalProfile(profile));
   }
 
@@ -101,7 +101,7 @@ class GeneratedFrbCoreApi implements FrbCoreApi {
     );
   }
 
-  frb.FrbTerminalProfile _terminalProfile(ConnectionProfile profile) {
+  frb.FrbTerminalProfile _terminalProfile(ResolvedConnectionProfile profile) {
     return frb.FrbTerminalProfile(
       relayHost: profile.relayHost,
       relayPort: profile.relayPort,

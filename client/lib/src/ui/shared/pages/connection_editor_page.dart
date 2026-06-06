@@ -90,15 +90,10 @@ class _ConnectionEditorPageState extends State<ConnectionEditorPage> {
     return widget.profile.copyWith(
       name: _name.text.trim(),
       relayConfigId: relayConfig.id,
-      relayHost: relayConfig.relayHost,
-      relayPort: relayConfig.relayPort,
       deviceId: _deviceId.text.trim(),
       sessionId: _sessionId.text.trim(),
-      relayApiKey: relayConfig.relayApiKey,
       password: _password.text,
       username: _username.text.trim(),
-      useTls: relayConfig.useTls,
-      allowBadCertificate: relayConfig.allowBadCertificate,
     );
   }
 

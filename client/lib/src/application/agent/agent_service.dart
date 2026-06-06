@@ -45,7 +45,7 @@ class AgentService {
     return settings;
   }
 
-  AgentConfig? resolveConfig({
+  AgentConfig? _resolveConfig({
     required AgentSettings settings,
     required List<RelayConfig> relayConfigs,
   }) {
@@ -69,11 +69,18 @@ class AgentService {
     return null;
   }
 
-  Future<void> start(AgentConfig config) {
+  Future<void> start(AgentSettings settings) async {
+    final config = _resolveConfig(
+      settings: settings,
+      relayConfigs: await _relayConfigs.loadAll(),
+    );
+    if (config == null) {
+      throw ArgumentError('请选择一个中继服务器');
+    }
     if (config.password.trim().isEmpty) {
       throw ArgumentError('SSH 密码不能为空');
     }
-    return _runtime.start(config);
+    await _runtime.start(config);
   }
 
   Future<void> stop() => _runtime.stop();

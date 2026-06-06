@@ -60,15 +60,10 @@ class SharedPreferencesConnectionProfileRepository
       id: now.toString(),
       name: '',
       relayConfigId: '',
-      relayHost: '',
-      relayPort: 0,
       deviceId: '',
       sessionId: '',
-      relayApiKey: '',
       password: '',
       username: '',
-      useTls: false,
-      allowBadCertificate: false,
       updatedAt: DateTime.now(),
     );
   }

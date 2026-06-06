@@ -3,30 +3,20 @@ class ConnectionProfile {
     required this.id,
     required this.name,
     required this.relayConfigId,
-    required this.relayHost,
-    required this.relayPort,
     required this.deviceId,
     required this.sessionId,
-    required this.relayApiKey,
     required this.password,
     required this.username,
-    required this.useTls,
-    required this.allowBadCertificate,
     required this.updatedAt,
   });
 
   final String id;
   final String name;
   final String relayConfigId;
-  final String relayHost;
-  final int relayPort;
   final String deviceId;
   final String sessionId;
-  final String relayApiKey;
   final String password;
   final String username;
-  final bool useTls;
-  final bool allowBadCertificate;
   final DateTime updatedAt;
 
   String get effectiveUsername {
@@ -45,30 +35,20 @@ class ConnectionProfile {
     String? id,
     String? name,
     String? relayConfigId,
-    String? relayHost,
-    int? relayPort,
     String? deviceId,
     String? sessionId,
-    String? relayApiKey,
     String? password,
     String? username,
-    bool? useTls,
-    bool? allowBadCertificate,
     DateTime? updatedAt,
   }) {
     return ConnectionProfile(
       id: id ?? this.id,
       name: name ?? this.name,
       relayConfigId: relayConfigId ?? this.relayConfigId,
-      relayHost: relayHost ?? this.relayHost,
-      relayPort: relayPort ?? this.relayPort,
       deviceId: deviceId ?? this.deviceId,
       sessionId: sessionId ?? this.sessionId,
-      relayApiKey: relayApiKey ?? this.relayApiKey,
       password: password ?? this.password,
       username: username ?? this.username,
-      useTls: useTls ?? this.useTls,
-      allowBadCertificate: allowBadCertificate ?? this.allowBadCertificate,
       updatedAt: updatedAt ?? this.updatedAt,
     );
   }
@@ -78,15 +58,10 @@ class ConnectionProfile {
       'id': id,
       'name': name,
       'relayConfigId': relayConfigId,
-      'relayHost': relayHost,
-      'relayPort': relayPort,
       'deviceId': deviceId,
       'sessionId': sessionId,
-      'relayApiKey': relayApiKey,
       'password': password,
       'username': username,
-      'useTls': useTls,
-      'allowBadCertificate': allowBadCertificate,
       'updatedAt': updatedAt.toIso8601String(),
     };
   }
@@ -96,16 +71,37 @@ class ConnectionProfile {
       id: json['id'] as String,
       name: json['name'] as String,
       relayConfigId: json['relayConfigId'] as String,
-      relayHost: json['relayHost'] as String,
-      relayPort: json['relayPort'] as int,
       deviceId: json['deviceId'] as String,
       sessionId: json['sessionId'] as String,
-      relayApiKey: json['relayApiKey'] as String,
       password: json['password'] as String,
       username: json['username'] as String,
-      useTls: json['useTls'] as bool,
-      allowBadCertificate: json['allowBadCertificate'] as bool,
       updatedAt: DateTime.parse(json['updatedAt'] as String),
     );
   }
+}
+
+class ResolvedConnectionProfile {
+  const ResolvedConnectionProfile({
+    required this.profile,
+    required this.relayHost,
+    required this.relayPort,
+    required this.relayApiKey,
+    required this.useTls,
+    required this.allowBadCertificate,
+  });
+
+  final ConnectionProfile profile;
+  final String relayHost;
+  final int relayPort;
+  final String relayApiKey;
+  final bool useTls;
+  final bool allowBadCertificate;
+
+  String get deviceId => profile.deviceId;
+
+  String get sessionId => profile.sessionId;
+
+  String get password => profile.password;
+
+  String get effectiveUsername => profile.effectiveUsername;
 }

@@ -26,7 +26,7 @@ class UnsupportedRustCoreBridge implements AgentRuntimePort, TerminalPort {
   }
 
   @override
-  Future<TerminalSessionHandle> openTerminal(ConnectionProfile profile) {
+  Future<TerminalSessionHandle> openTerminal(ResolvedConnectionProfile profile) {
     throw UnsupportedError('Rust core bridge is not wired yet.');
   }
 }
@@ -66,7 +66,9 @@ class RustCoreBridge implements AgentRuntimePort, TerminalPort {
   }
 
   @override
-  Future<TerminalSessionHandle> openTerminal(ConnectionProfile profile) async {
+  Future<TerminalSessionHandle> openTerminal(
+    ResolvedConnectionProfile profile,
+  ) async {
     final api = _requireApi();
     final id = await api.openTerminal(profile);
     return FrbTerminalSessionHandle(

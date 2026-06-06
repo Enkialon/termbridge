@@ -85,15 +85,7 @@ class _AgentPageState extends State<AgentPage> {
   Future<void> _start() async {
     final settings = await _save(showMessage: false);
     if (settings == null) return;
-    final config = widget.service.resolveConfig(
-      settings: settings,
-      relayConfigs: _groups,
-    );
-    if (config == null) {
-      _showError('请选择一个中继服务器');
-      return;
-    }
-    await _run(() => widget.service.start(config));
+    await _run(() => widget.service.start(settings));
   }
 
   Future<void> _stop() => _run(widget.service.stop);

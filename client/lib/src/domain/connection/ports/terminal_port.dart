@@ -1,7 +1,7 @@
 import '../entities/connection_profile.dart';
 
 abstract interface class TerminalPort {
-  Future<TerminalSessionHandle> openTerminal(ConnectionProfile profile);
+  Future<TerminalSessionHandle> openTerminal(ResolvedConnectionProfile profile);
 }
 
 abstract interface class TerminalSessionHandle {

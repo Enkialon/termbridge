@@ -12,7 +12,7 @@ abstract interface class FrbCoreApi {
 
   Future<AgentStatus> agentStatus();
 
-  Future<int> openTerminal(ConnectionProfile profile);
+  Future<int> openTerminal(ResolvedConnectionProfile profile);
 
   Future<void> terminalWrite({
     required int id,

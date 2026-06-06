@@ -4,7 +4,6 @@ import '../../app/app_services.dart';
 import '../../application/agent/agent_service.dart';
 import '../../application/connection/terminal_service.dart';
 import '../../application/relay/relay_service.dart';
-import '../../domain/agent/entities/agent_config.dart';
 import '../../domain/agent/entities/agent_settings.dart';
 import '../../domain/agent/entities/agent_status.dart';
 import '../../domain/connection/entities/connection_profile.dart';
@@ -295,7 +294,7 @@ class _ConnectionPane extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                       ),
                       subtitle: Text(
-                        '${profile.relayHost}:${profile.relayPort}  ${profile.deviceId}',
+                        '${profile.relayConfigId}  ${profile.deviceId}',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -454,21 +453,7 @@ class _AgentPaneState extends State<_AgentPane> {
     final settings = await _save(showMessage: false);
     if (!mounted) return;
     if (settings == null) return;
-    final config = _agentConfig(settings);
-    if (config == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('请选择一个中继服务器')),
-      );
-      return;
-    }
-    await _run(() => widget.service.start(config));
-  }
-
-  AgentConfig? _agentConfig(AgentSettings settings) {
-    return widget.service.resolveConfig(
-      settings: settings,
-      relayConfigs: _groups,
-    );
+    await _run(() => widget.service.start(settings));
   }
 
   Future<void> _stop() => _run(widget.service.stop);

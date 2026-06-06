@@ -186,7 +186,7 @@ class _ConnectionTile extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '${profile.relayHost}:${profile.relayPort} · '
+                      '${profile.relayConfigId} · '
                       '${profile.deviceId} · ${profile.sessionId}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
