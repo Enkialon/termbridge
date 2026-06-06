@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:xterm/xterm.dart';
 
 import '../../../application/connection/connection_service.dart';
@@ -33,6 +34,8 @@ class TerminalPage extends StatefulWidget {
 
 class _TerminalPageState extends State<TerminalPage> {
   final _terminal = Terminal();
+  final _terminalController = TerminalController();
+  final _terminalFocusNode = FocusNode();
 
   TerminalSessionHandle? _session;
   StreamSubscription<String>? _outputSubscription;
@@ -47,7 +50,10 @@ class _TerminalPageState extends State<TerminalPage> {
     _terminal.write('TH 远程终端\r\n');
     _terminal.write('正在连接 ${widget.profile.name}...\r\n');
     unawaited(_loadRelayLabel());
-    WidgetsBinding.instance.addPostFrameCallback((_) => _connect());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _focusTerminal();
+      _connect();
+    });
   }
 
   Future<void> _loadRelayLabel() async {
@@ -61,16 +67,22 @@ class _TerminalPageState extends State<TerminalPage> {
   }
 
   Future<void> _connect() async {
-    if (_connecting || _connected) return;
+    if (_connecting || _session != null) return;
 
     setState(() {
       _connecting = true;
+      _connected = false;
       _status = '连接中';
     });
 
     try {
       final session = await widget.service.open(widget.profile);
-      if (!mounted) return;
+      if (!mounted) {
+        await session.close();
+        return;
+      }
+
+      await _outputSubscription?.cancel();
 
       _terminal.buffer.clear();
       _terminal.buffer.setCursor(0, 0);
@@ -80,24 +92,19 @@ class _TerminalPageState extends State<TerminalPage> {
       };
       _outputSubscription = session.output
           .transform(utf8.decoder)
-          .listen(_terminal.write, onError: _handleOutputError, onDone: () {
-        if (!mounted) return;
-        setState(() {
-          _session = null;
-          _connected = false;
-          _status = '未连接';
-        });
-      });
+          .listen(_terminal.write, onError: _handleOutputError, onDone: _handleSessionDone);
 
       setState(() {
         _session = session;
         _connected = true;
         _status = '已连接';
       });
+      _focusTerminal();
     } catch (error) {
       _terminal.write('\r\n连接失败: $error\r\n');
       if (!mounted) return;
       setState(() {
+        _connected = false;
         _status = '失败';
       });
     } finally {
@@ -122,21 +129,136 @@ class _TerminalPageState extends State<TerminalPage> {
     _terminal.onResize = null;
     await outputSubscription?.cancel();
     await session?.close();
+    _focusTerminal();
   }
 
   void _sendText(String data) {
     final session = _session;
-    if (session == null) return;
+    if (session == null || data.isEmpty) return;
     unawaited(session.write(utf8.encode(data)));
+  }
+
+  void _focusTerminal() {
+    if (!mounted) return;
+    _terminalFocusNode.requestFocus();
+  }
+
+  void _clearTerminal() {
+    if (_session == null) {
+      _terminal.buffer.clear();
+      _terminal.buffer.setCursor(0, 0);
+    } else {
+      _sendText('\x0c');
+    }
+    _terminalController.clearSelection();
+    _focusTerminal();
+  }
+
+  Future<void> _copySelection() async {
+    final selection = _terminalController.selection;
+    if (selection == null) {
+      _focusTerminal();
+      return;
+    }
+    final text = _terminal.buffer.getText(selection);
+    if (text.isNotEmpty) {
+      await Clipboard.setData(ClipboardData(text: text));
+    }
+    _focusTerminal();
+  }
+
+  Future<void> _pasteClipboard() async {
+    final data = await Clipboard.getData(Clipboard.kTextPlain);
+    final text = data?.text;
+    if (text != null && text.isNotEmpty) {
+      _terminal.paste(text);
+    }
+    _terminalController.clearSelection();
+    _focusTerminal();
+  }
+
+  Future<void> _showTerminalContextMenu(TapDownDetails details) async {
+    _focusTerminal();
+    final overlay =
+        Overlay.of(context).context.findRenderObject() as RenderBox?;
+    if (overlay == null) return;
+
+    final position = RelativeRect.fromRect(
+      details.globalPosition & const Size(1, 1),
+      Offset.zero & overlay.size,
+    );
+    final action = await showMenu<String>(
+      context: context,
+      position: position,
+      items: const [
+        PopupMenuItem(
+          value: 'copy',
+          child: ListTile(
+            dense: true,
+            leading: Icon(Icons.copy),
+            title: Text('复制'),
+          ),
+        ),
+        PopupMenuItem(
+          value: 'paste',
+          child: ListTile(
+            dense: true,
+            leading: Icon(Icons.content_paste),
+            title: Text('粘贴'),
+          ),
+        ),
+        PopupMenuDivider(),
+        PopupMenuItem(
+          value: 'clear',
+          child: ListTile(
+            dense: true,
+            leading: Icon(Icons.cleaning_services_outlined),
+            title: Text('清屏'),
+          ),
+        ),
+      ],
+    );
+
+    switch (action) {
+      case 'copy':
+        await _copySelection();
+        break;
+      case 'paste':
+        await _pasteClipboard();
+        break;
+      case 'clear':
+        _clearTerminal();
+        break;
+      default:
+        _focusTerminal();
+    }
   }
 
   void _handleOutputError(Object error, StackTrace stackTrace) {
     _terminal.write('\r\nSession error: $error\r\n');
+
+    final session = _session;
+    _session = null;
+    _outputSubscription = null;
+    if (session != null) {
+      unawaited(session.close());
+    }
+
     if (!mounted) return;
     setState(() {
-      _session = null;
       _connected = false;
       _status = '失败';
+    });
+  }
+
+  void _handleSessionDone() {
+    if (!mounted) return;
+
+    setState(() {
+      _session = null;
+      _outputSubscription = null;
+      _connected = false;
+      _status = '未连接';
     });
   }
 
@@ -224,6 +346,8 @@ class _TerminalPageState extends State<TerminalPage> {
   void dispose() {
     _terminal.onOutput = null;
     _terminal.onResize = null;
+    _terminalFocusNode.dispose();
+    _terminalController.dispose();
     final outputSubscription = _outputSubscription;
     final session = _session;
     if (outputSubscription != null) {
@@ -262,7 +386,14 @@ class _TerminalPageState extends State<TerminalPage> {
               decoration: const BoxDecoration(color: Color(0xff050708)),
               child: TerminalView(
                 _terminal,
+                controller: _terminalController,
+                focusNode: _terminalFocusNode,
                 autofocus: true,
+                onTapUp: (_, __) => _focusTerminal(),
+                onSecondaryTapDown: (details, __) {
+                  unawaited(_showTerminalContextMenu(details));
+                },
+                keyboardType: TextInputType.text,
                 padding: const EdgeInsets.all(8),
                 textStyle: TerminalStyle(
                   fontSize: compact ? 13 : 14,
@@ -287,10 +418,7 @@ class _TerminalPageState extends State<TerminalPage> {
             connected: _connected,
             onConnect: _connect,
             onDisconnect: _disconnect,
-            onClear: () {
-              _terminal.buffer.clear();
-              _terminal.buffer.setCursor(0, 0);
-            },
+            onClear: _clearTerminal,
           ),
           Expanded(child: content),
         ],
@@ -334,10 +462,7 @@ class _TerminalPageState extends State<TerminalPage> {
           ),
           IconButton(
             tooltip: '清屏',
-            onPressed: () {
-              _terminal.buffer.clear();
-              _terminal.buffer.setCursor(0, 0);
-            },
+            onPressed: _clearTerminal,
             icon: const Icon(Icons.cleaning_services_outlined),
           ),
           IconButton(
