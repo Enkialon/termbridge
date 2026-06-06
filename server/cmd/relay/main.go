@@ -14,6 +14,11 @@ import (
 	shared "th/shared/protocol"
 )
 
+const (
+	firstMessageTimeout = 10 * time.Second
+	agentSendTimeout    = 5 * time.Second
+)
+
 type relayServer struct {
 	relayAPIKey string
 
@@ -91,12 +96,14 @@ func listen(addr, certFile, keyFile string) (net.Listener, error) {
 }
 
 func (s *relayServer) handleConn(conn net.Conn) {
+	_ = conn.SetReadDeadline(time.Now().Add(firstMessageTimeout))
 	msg, err := shared.ReadControl(conn)
 	if err != nil {
 		log.Printf("read hello from %s: %v", conn.RemoteAddr(), err)
 		_ = conn.Close()
 		return
 	}
+	_ = conn.SetReadDeadline(time.Time{})
 
 	if !s.authorized(msg.RelayAPIKey) {
 		_ = shared.WriteError(conn, "unauthorized")
@@ -184,11 +191,19 @@ func (s *relayServer) handleClient(conn net.Conn, msg shared.ControlMessage) {
 		return
 	}
 
-	agent.send <- shared.ControlMessage{
+	sessionOpen := shared.ControlMessage{
 		Type:       shared.TypeSessionOpen,
 		DeviceID:   msg.DeviceID,
 		SessionID:  msg.SessionID,
 		Transports: []string{shared.TransportRelayTCP},
+	}
+	select {
+	case agent.send <- sessionOpen:
+	case <-time.After(agentSendTimeout):
+		s.removePendingSession(msg.DeviceID, msg.SessionID, conn)
+		_ = shared.WriteError(conn, "agent busy")
+		_ = conn.Close()
+		return
 	}
 	go s.expirePendingSession(msg.DeviceID, msg.SessionID, conn, 15*time.Second)
 	log.Printf("client waiting device=%s session=%s", msg.DeviceID, msg.SessionID)
@@ -214,6 +229,18 @@ func (s *relayServer) prepareSession(deviceID, sessionID string, client net.Conn
 		createdAt: time.Now(),
 	}
 	return agent, nil
+}
+
+func (s *relayServer) removePendingSession(deviceID, sessionID string, client net.Conn) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	key := sessionKey(deviceID, sessionID)
+	pending := s.sessions[key]
+	if pending == nil || pending.client != client {
+		return
+	}
+	delete(s.sessions, key)
 }
 
 func (s *relayServer) expirePendingSession(deviceID, sessionID string, client net.Conn, ttl time.Duration) {

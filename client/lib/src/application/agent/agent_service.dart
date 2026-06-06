@@ -66,7 +66,12 @@ class AgentService {
     return null;
   }
 
-  Future<void> start(AgentConfig config) => _runtime.start(config);
+  Future<void> start(AgentConfig config) {
+    if (config.password.trim().isEmpty) {
+      throw ArgumentError('SSH 密码不能为空');
+    }
+    return _runtime.start(config);
+  }
 
   Future<void> stop() => _runtime.stop();
 }
