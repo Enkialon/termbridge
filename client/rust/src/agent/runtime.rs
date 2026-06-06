@@ -5,9 +5,13 @@ use tokio::task::JoinHandle;
 use std::sync::Arc;
 
 #[cfg(not(target_os = "android"))]
-use crate::relay::connect_agent_tunnel;
+use crate::relay::{
+    MessageType, connect_agent_session_tunnel, connect_agent_stream, read_control_line_blocking,
+};
 #[cfg(not(target_os = "android"))]
 use crate::ssh::{SshServerConfig, run_pty_ssh_server};
+#[cfg(not(target_os = "android"))]
+use anyhow::{Context, bail};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentConfig {
@@ -105,29 +109,63 @@ impl AgentRuntime {
 #[cfg(not(target_os = "android"))]
 async fn run_agent_once(
     config: AgentConfig,
-    stop: oneshot::Receiver<()>,
+    mut stop: oneshot::Receiver<()>,
     status: Arc<Mutex<AgentStatus>>,
 ) -> anyhow::Result<()> {
-    let tunnel = connect_agent_tunnel(&config).await?;
+    let mut control = connect_agent_stream(&config).await?;
     *status.lock().await = AgentStatus::Online;
+    let mut sessions = Vec::<JoinHandle<anyhow::Result<()>>>::new();
 
-    tokio::select! {
-        result = run_pty_ssh_server(
-            tunnel,
-            SshServerConfig {
-                password: if config.password.is_empty() {
-                    None
-                } else {
-                    Some(config.password)
-                },
-                shell: Some(config.shell),
-            },
-        ) => {
-            result?;
+    loop {
+        tokio::select! {
+            line = read_control_line_blocking(&mut control) => {
+                let line = line?;
+                let message: crate::relay::ControlMessage =
+                    serde_json::from_slice(&line).context("invalid relay control JSON")?;
+                match message.message_type {
+                    MessageType::SessionOpen => {
+                        let session_id = message.session_id.context("session.open missing sessionId")?;
+                        let session_config = config.clone();
+                        sessions.push(tokio::spawn(async move {
+                            run_agent_session(session_config, session_id).await
+                        }));
+                    }
+                    MessageType::Heartbeat => {
+                        sessions.retain(|session| !session.is_finished());
+                    }
+                    MessageType::Error => {
+                        let message = message.message.unwrap_or_else(|| "relay returned error".to_string());
+                        bail!("{message}");
+                    }
+                    other => bail!("unexpected relay control message: {other:?}"),
+                }
+            }
+            _ = &mut stop => {
+                for session in sessions {
+                    session.abort();
+                }
+                break;
+            }
         }
-        _ = stop => {}
     }
 
     *status.lock().await = AgentStatus::Stopped;
     Ok(())
+}
+
+#[cfg(not(target_os = "android"))]
+async fn run_agent_session(config: AgentConfig, session_id: String) -> anyhow::Result<()> {
+    let tunnel = connect_agent_session_tunnel(&config, session_id).await?;
+    run_pty_ssh_server(
+        tunnel,
+        SshServerConfig {
+            password: if config.password.is_empty() {
+                None
+            } else {
+                Some(config.password)
+            },
+            shell: Some(config.shell),
+        },
+    )
+    .await
 }

@@ -54,6 +54,16 @@ impl ControlMessage {
         }
     }
 
+    pub fn agent_session(config: &AgentConfig, session_id: String) -> Self {
+        Self {
+            message_type: MessageType::AgentSession,
+            device_id: Some(config.device_id.clone()),
+            session_id: Some(session_id),
+            relay_api_key: Some(config.relay_api_key.clone()),
+            message: None,
+        }
+    }
+
     pub fn encode_line(&self) -> anyhow::Result<Vec<u8>> {
         let mut encoded = serde_json::to_vec(self)?;
         encoded.push(b'\n');
