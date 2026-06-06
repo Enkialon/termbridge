@@ -123,6 +123,14 @@ client/lib/src/rust/frb_generated.web.dart
 client/android/app/src/main/jniLibs/
 
 # =========================================================
+# Xcode / CocoaPods / macOS / iOS
+# =========================================================
+**/Pods/
+**/xcuserdata/
+**/xcshareddata/
+*.xcworkspace/xcuserdata/
+
+# =========================================================
 # Secrets / local environment
 # =========================================================
 .env
