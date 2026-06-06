@@ -8,7 +8,7 @@ import '../../domain/agent/entities/agent_config.dart';
 import '../../domain/agent/entities/agent_settings.dart';
 import '../../domain/agent/entities/agent_status.dart';
 import '../../domain/connection/entities/connection_profile.dart';
-import '../../domain/relay/entities/service_group.dart';
+import '../../domain/relay/entities/relay_config.dart';
 import '../shared/pages/connection_editor_page.dart';
 import '../shared/pages/terminal_page.dart';
 
@@ -390,7 +390,7 @@ class _AgentPaneState extends State<_AgentPane> {
   final _deviceId = TextEditingController();
   final _shell = TextEditingController();
   final _password = TextEditingController();
-  var _groups = <ServiceGroup>[];
+  var _groups = <RelayConfig>[];
   String? _selectedGroupId;
   var _showPassword = false;
   var _busy = false;
@@ -405,15 +405,16 @@ class _AgentPaneState extends State<_AgentPane> {
   Future<void> _load() async {
     final state = await widget.service.load();
     if (!mounted) return;
-    final selectedGroupId =
-        state.groups.any((group) => group.id == state.settings.serviceGroupId)
-            ? state.settings.serviceGroupId
-            : null;
+    final selectedGroupId = state.relayConfigs.any(
+      (group) => group.id == state.settings.relayConfigId,
+    )
+        ? state.settings.relayConfigId
+        : null;
     setState(() {
       _deviceId.text = state.settings.deviceId;
       _shell.text = state.settings.shell;
       _password.text = state.settings.password;
-      _groups = state.groups;
+      _groups = state.relayConfigs;
       _selectedGroupId = selectedGroupId;
       _loaded = true;
     });
@@ -433,7 +434,7 @@ class _AgentPaneState extends State<_AgentPane> {
       deviceId: _deviceId.text.trim(),
       shell: _shell.text.trim(),
       password: _password.text,
-      serviceGroupId: _selectedGroupId,
+      relayConfigId: _selectedGroupId,
     );
   }
 
@@ -464,7 +465,10 @@ class _AgentPaneState extends State<_AgentPane> {
   }
 
   AgentConfig? _agentConfig(AgentSettings settings) {
-    return widget.service.resolveConfig(settings: settings, groups: _groups);
+    return widget.service.resolveConfig(
+      settings: settings,
+      relayConfigs: _groups,
+    );
   }
 
   Future<void> _stop() => _run(widget.service.stop);
@@ -674,8 +678,8 @@ class _RelayPaneState extends State<_RelayPane> {
   final _host = TextEditingController();
   final _port = TextEditingController();
   final _relayApiKey = TextEditingController();
-  var _groups = <ServiceGroup>[];
-  ServiceGroup? _selected;
+  var _groups = <RelayConfig>[];
+  RelayConfig? _selected;
   final _testing = <String>{};
   var _useTls = false;
   var _allowBadCertificate = false;
@@ -711,7 +715,7 @@ class _RelayPaneState extends State<_RelayPane> {
     });
   }
 
-  void _select(ServiceGroup group) {
+  void _select(RelayConfig group) {
     setState(() {
       _selected = group;
       _name.text = group.name;
@@ -743,7 +747,7 @@ class _RelayPaneState extends State<_RelayPane> {
       if (reloaded.isNotEmpty) _select(reloaded.first);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(_relayTestMessage(saved))),
+          SnackBar(content: Text(_relaySaveMessage(saved))),
         );
       }
     } finally {
@@ -751,20 +755,22 @@ class _RelayPaneState extends State<_RelayPane> {
     }
   }
 
-  Future<void> _test(ServiceGroup group) async {
+  Future<void> _test(RelayConfig group) async {
     if (_testing.contains(group.id)) return;
     setState(() => _testing.add(group.id));
-    final wasSelected = _selected?.id == group.id;
     try {
-      final saved = await widget.service.testAndSave(group);
-      await _load();
+      final tested = await widget.service.test(group);
       if (!mounted) return;
-      final reloaded = _groups.where((value) => value.id == saved.id);
-      if (reloaded.isNotEmpty && wasSelected) {
-        _select(reloaded.first);
-      }
+      setState(() {
+        _groups = _groups
+            .map((value) => value.id == tested.id ? tested : value)
+            .toList();
+        if (_selected?.id == tested.id) {
+          _selected = tested;
+        }
+      });
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(_relayTestMessage(saved))),
+        SnackBar(content: Text(_relayTestMessage(tested))),
       );
     } finally {
       if (mounted) {
@@ -1063,20 +1069,27 @@ class _RelayPaneState extends State<_RelayPane> {
   }
 }
 
-String _relayTestLabel(ServiceGroup group) {
+String _relayTestLabel(RelayConfig group) {
   if (group.lastLatencyMs != null) return '${group.lastLatencyMs}ms';
   if (group.lastTestError != null) return group.lastTestError!;
   return '测试';
 }
 
-String _relayTestMessage(ServiceGroup group) {
+String _relayTestMessage(RelayConfig group) {
+  if (group.lastLatencyMs != null) {
+    return '测试成功，延迟 ${group.lastLatencyMs}ms';
+  }
+  return '测试${group.lastTestError ?? '未完成'}';
+}
+
+String _relaySaveMessage(RelayConfig group) {
   if (group.lastLatencyMs != null) {
     return '中继服务器已保存，延迟 ${group.lastLatencyMs}ms';
   }
   return '中继服务器已保存，测试${group.lastTestError ?? '未完成'}';
 }
 
-IconData _relayTestIcon(ServiceGroup group) {
+IconData _relayTestIcon(RelayConfig group) {
   if (group.lastLatencyMs != null) return Icons.speed_outlined;
   if (group.lastTestError != null) return Icons.error_outline;
   return Icons.network_check_outlined;
@@ -1089,7 +1102,7 @@ class _RelayTestButton extends StatelessWidget {
     required this.onPressed,
   });
 
-  final ServiceGroup group;
+  final RelayConfig group;
   final bool testing;
   final VoidCallback onPressed;
 

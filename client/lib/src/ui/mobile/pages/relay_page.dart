@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../application/relay/relay_service.dart';
-import '../../../domain/relay/entities/service_group.dart';
+import '../../../domain/relay/entities/relay_config.dart';
 
 class RelayPage extends StatefulWidget {
   const RelayPage({
@@ -16,7 +16,7 @@ class RelayPage extends StatefulWidget {
 }
 
 class _RelayPageState extends State<RelayPage> {
-  late Future<List<ServiceGroup>> _groups = widget.service.loadAll();
+  late Future<List<RelayConfig>> _groups = widget.service.loadAll();
   final _testing = <String>{};
 
   void _reload() {
@@ -25,7 +25,7 @@ class _RelayPageState extends State<RelayPage> {
     });
   }
 
-  Future<void> _openEditor([ServiceGroup? group]) async {
+  Future<void> _openEditor([RelayConfig? group]) async {
     final saved = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
         builder: (context) => RelayEditorPage(
@@ -37,7 +37,7 @@ class _RelayPageState extends State<RelayPage> {
     if (saved == true) _reload();
   }
 
-  Future<void> _test(ServiceGroup group) async {
+  Future<void> _test(RelayConfig group) async {
     if (_testing.contains(group.id)) return;
     setState(() => _testing.add(group.id));
     try {
@@ -66,7 +66,7 @@ class _RelayPageState extends State<RelayPage> {
         child: const Icon(Icons.add),
       ),
       body: SafeArea(
-        child: FutureBuilder<List<ServiceGroup>>(
+        child: FutureBuilder<List<RelayConfig>>(
           future: _groups,
           builder: (context, snapshot) {
             if (!snapshot.hasData) {
@@ -154,7 +154,7 @@ class RelayEditorPage extends StatefulWidget {
   });
 
   final RelayService service;
-  final ServiceGroup? group;
+  final RelayConfig? group;
 
   @override
   State<RelayEditorPage> createState() => _RelayEditorPageState();
@@ -192,7 +192,7 @@ class _RelayEditorPageState extends State<RelayEditorPage> {
     super.dispose();
   }
 
-  Future<ServiceGroup?> _save() async {
+  Future<RelayConfig?> _save() async {
     if (!_formKey.currentState!.validate() || _saving) return null;
     setState(() => _saving = true);
     try {
@@ -346,20 +346,20 @@ class _RelayEditorPageState extends State<RelayEditorPage> {
   }
 }
 
-String _relayTestLabel(ServiceGroup group) {
+String _relayTestLabel(RelayConfig group) {
   if (group.lastLatencyMs != null) return '${group.lastLatencyMs}ms';
   if (group.lastTestError != null) return group.lastTestError!;
   return '测试';
 }
 
-String _relayTestMessage(ServiceGroup group) {
+String _relayTestMessage(RelayConfig group) {
   if (group.lastLatencyMs != null) {
     return '中继服务器已保存，延迟 ${group.lastLatencyMs}ms';
   }
   return '中继服务器已保存，测试${group.lastTestError ?? '未完成'}';
 }
 
-IconData _relayTestIcon(ServiceGroup group) {
+IconData _relayTestIcon(RelayConfig group) {
   if (group.lastLatencyMs != null) return Icons.speed_outlined;
   if (group.lastTestError != null) return Icons.error_outline;
   return Icons.network_check_outlined;
@@ -372,7 +372,7 @@ class _RelayTestButton extends StatelessWidget {
     required this.onPressed,
   });
 
-  final ServiceGroup group;
+  final RelayConfig group;
   final bool testing;
   final VoidCallback onPressed;
 

@@ -2,6 +2,7 @@ class ConnectionProfile {
   const ConnectionProfile({
     required this.id,
     required this.name,
+    required this.relayConfigId,
     required this.relayHost,
     required this.relayPort,
     required this.deviceId,
@@ -16,6 +17,7 @@ class ConnectionProfile {
 
   final String id;
   final String name;
+  final String relayConfigId;
   final String relayHost;
   final int relayPort;
   final String deviceId;
@@ -42,6 +44,7 @@ class ConnectionProfile {
   ConnectionProfile copyWith({
     String? id,
     String? name,
+    String? relayConfigId,
     String? relayHost,
     int? relayPort,
     String? deviceId,
@@ -56,6 +59,7 @@ class ConnectionProfile {
     return ConnectionProfile(
       id: id ?? this.id,
       name: name ?? this.name,
+      relayConfigId: relayConfigId ?? this.relayConfigId,
       relayHost: relayHost ?? this.relayHost,
       relayPort: relayPort ?? this.relayPort,
       deviceId: deviceId ?? this.deviceId,
@@ -73,6 +77,7 @@ class ConnectionProfile {
     return {
       'id': id,
       'name': name,
+      'relayConfigId': relayConfigId,
       'relayHost': relayHost,
       'relayPort': relayPort,
       'deviceId': deviceId,
@@ -90,6 +95,7 @@ class ConnectionProfile {
     return ConnectionProfile(
       id: json['id'] as String,
       name: json['name'] as String,
+      relayConfigId: json['relayConfigId'] as String,
       relayHost: json['relayHost'] as String,
       relayPort: json['relayPort'] as int,
       deviceId: json['deviceId'] as String,

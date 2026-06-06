@@ -3,8 +3,8 @@ import 'dart:convert';
 import 'dart:io';
 
 import '../../domain/agent/ports/agent_settings_repository.dart';
-import '../../domain/relay/entities/service_group.dart';
-import '../../domain/relay/ports/service_group_repository.dart';
+import '../../domain/relay/entities/relay_config.dart';
+import '../../domain/relay/ports/relay_config_repository.dart';
 
 const _relayTestTimeout = Duration(seconds: 5);
 
@@ -33,7 +33,7 @@ class RelayConfigInput {
     required this.allowBadCertificate,
   });
 
-  final ServiceGroup? selected;
+  final RelayConfig? selected;
   final String name;
   final String host;
   final int port;
@@ -44,20 +44,20 @@ class RelayConfigInput {
 
 class RelayService {
   const RelayService({
-    required ServiceGroupRepository groups,
+    required RelayConfigRepository relayConfigs,
     required AgentSettingsRepository agentSettings,
-  })  : _groups = groups,
+  })  : _relayConfigs = relayConfigs,
         _agentSettings = agentSettings;
 
-  final ServiceGroupRepository _groups;
+  final RelayConfigRepository _relayConfigs;
   final AgentSettingsRepository _agentSettings;
 
-  Future<List<ServiceGroup>> loadAll() => _groups.loadAll();
+  Future<List<RelayConfig>> loadAll() => _relayConfigs.loadAll();
 
-  Future<ServiceGroup> save(RelayConfigInput input) async {
+  Future<RelayConfig> save(RelayConfigInput input) async {
     final selected = input.selected;
     final test = await testConnection(input);
-    final group = ServiceGroup(
+    final relayConfig = RelayConfig(
       id: selected?.id ?? DateTime.now().microsecondsSinceEpoch.toString(),
       name: input.name,
       relayHost: input.host,
@@ -70,30 +70,30 @@ class RelayService {
       lastTestedAt: test.testedAt,
       lastTestError: test.errorMessage,
     );
-    await _groups.save(group);
-    return group;
+    await _relayConfigs.save(relayConfig);
+    return relayConfig;
   }
 
-  Future<ServiceGroup> testAndSave(ServiceGroup group) async {
+  Future<RelayConfig> testAndSave(RelayConfig relayConfig) async {
     final test = await testConnection(
       RelayConfigInput(
-        selected: group,
-        name: group.name,
-        host: group.relayHost,
-        port: group.relayPort,
-        relayApiKey: group.relayApiKey,
-        useTls: group.useTls,
-        allowBadCertificate: group.allowBadCertificate,
+        selected: relayConfig,
+        name: relayConfig.name,
+        host: relayConfig.relayHost,
+        port: relayConfig.relayPort,
+        relayApiKey: relayConfig.relayApiKey,
+        useTls: relayConfig.useTls,
+        allowBadCertificate: relayConfig.allowBadCertificate,
       ),
     );
-    final saved = group.copyWith(
+    final saved = relayConfig.copyWith(
       lastLatencyMs: test.latencyMs,
       lastTestedAt: test.testedAt,
       lastTestError: test.errorMessage,
       clearLastLatency: test.latencyMs == null,
       clearLastTestError: test.errorMessage == null,
     );
-    await _groups.save(saved);
+    await _relayConfigs.save(saved);
     return saved;
   }
 
@@ -167,9 +167,11 @@ class RelayService {
     }
   }
 
-  Future<void> setAsAgentRelay(ServiceGroup group) async {
+  Future<void> setAsAgentRelay(RelayConfig relayConfig) async {
     final settings = await _agentSettings.load();
-    await _agentSettings.save(settings.copyWith(serviceGroupId: group.id));
+    await _agentSettings.save(
+      settings.copyWith(relayConfigId: relayConfig.id),
+    );
   }
 }
 

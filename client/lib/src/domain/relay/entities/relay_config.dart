@@ -1,5 +1,5 @@
-class ServiceGroup {
-  const ServiceGroup({
+class RelayConfig {
+  const RelayConfig({
     required this.id,
     required this.name,
     required this.relayHost,
@@ -25,7 +25,7 @@ class ServiceGroup {
   final DateTime? lastTestedAt;
   final String? lastTestError;
 
-  ServiceGroup copyWith({
+  RelayConfig copyWith({
     String? id,
     String? name,
     String? relayHost,
@@ -40,7 +40,7 @@ class ServiceGroup {
     bool clearLastLatency = false,
     bool clearLastTestError = false,
   }) {
-    return ServiceGroup(
+    return RelayConfig(
       id: id ?? this.id,
       name: name ?? this.name,
       relayHost: relayHost ?? this.relayHost,
@@ -73,8 +73,8 @@ class ServiceGroup {
     };
   }
 
-  factory ServiceGroup.fromJson(Map<String, Object?> json) {
-    return ServiceGroup(
+  factory RelayConfig.fromJson(Map<String, Object?> json) {
+    return RelayConfig(
       id: json['id'] as String,
       name: json['name'] as String,
       relayHost: json['relayHost'] as String,

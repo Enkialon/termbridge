@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../application/agent/agent_service.dart';
 import '../../../domain/agent/entities/agent_settings.dart';
 import '../../../domain/agent/entities/agent_status.dart';
-import '../../../domain/relay/entities/service_group.dart';
+import '../../../domain/relay/entities/relay_config.dart';
 
 class AgentPage extends StatefulWidget {
   const AgentPage({
@@ -22,7 +22,7 @@ class _AgentPageState extends State<AgentPage> {
   final _deviceId = TextEditingController();
   final _shell = TextEditingController();
   final _password = TextEditingController();
-  var _groups = <ServiceGroup>[];
+  var _groups = <RelayConfig>[];
   String? _selectedGroupId;
   var _showPassword = false;
   var _busy = false;
@@ -37,15 +37,16 @@ class _AgentPageState extends State<AgentPage> {
   Future<void> _load() async {
     final state = await widget.service.load();
     if (!mounted) return;
-    final selectedGroupId =
-        state.groups.any((group) => group.id == state.settings.serviceGroupId)
-            ? state.settings.serviceGroupId
-            : null;
+    final selectedGroupId = state.relayConfigs.any(
+      (group) => group.id == state.settings.relayConfigId,
+    )
+        ? state.settings.relayConfigId
+        : null;
     setState(() {
       _deviceId.text = state.settings.deviceId;
       _shell.text = state.settings.shell;
       _password.text = state.settings.password;
-      _groups = state.groups;
+      _groups = state.relayConfigs;
       _selectedGroupId = selectedGroupId;
       _loaded = true;
     });
@@ -65,7 +66,7 @@ class _AgentPageState extends State<AgentPage> {
       deviceId: _deviceId.text.trim(),
       shell: _shell.text.trim(),
       password: _password.text,
-      serviceGroupId: _selectedGroupId,
+      relayConfigId: _selectedGroupId,
     );
   }
 
@@ -86,7 +87,7 @@ class _AgentPageState extends State<AgentPage> {
     if (settings == null) return;
     final config = widget.service.resolveConfig(
       settings: settings,
-      groups: _groups,
+      relayConfigs: _groups,
     );
     if (config == null) {
       _showError('请选择一个中继服务器');

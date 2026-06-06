@@ -3,38 +3,41 @@ import '../../domain/agent/entities/agent_settings.dart';
 import '../../domain/agent/entities/agent_status.dart';
 import '../../domain/agent/ports/agent_runtime_port.dart';
 import '../../domain/agent/ports/agent_settings_repository.dart';
-import '../../domain/relay/entities/service_group.dart';
-import '../../domain/relay/ports/service_group_repository.dart';
+import '../../domain/relay/entities/relay_config.dart';
+import '../../domain/relay/ports/relay_config_repository.dart';
 
 class AgentRuntimeState {
   const AgentRuntimeState({
     required this.settings,
-    required this.groups,
+    required this.relayConfigs,
   });
 
   final AgentSettings settings;
-  final List<ServiceGroup> groups;
+  final List<RelayConfig> relayConfigs;
 }
 
 class AgentService {
   const AgentService({
     required AgentRuntimePort runtime,
     required AgentSettingsRepository settings,
-    required ServiceGroupRepository groups,
+    required RelayConfigRepository relayConfigs,
   })  : _runtime = runtime,
         _settings = settings,
-        _groups = groups;
+        _relayConfigs = relayConfigs;
 
   final AgentRuntimePort _runtime;
   final AgentSettingsRepository _settings;
-  final ServiceGroupRepository _groups;
+  final RelayConfigRepository _relayConfigs;
 
   Stream<AgentStatus> watchStatus() => _runtime.watchStatus();
 
   Future<AgentRuntimeState> load() async {
     final settings = await _settings.load();
-    final groups = await _groups.loadAll();
-    return AgentRuntimeState(settings: settings, groups: groups);
+    final relayConfigs = await _relayConfigs.loadAll();
+    return AgentRuntimeState(
+      settings: settings,
+      relayConfigs: relayConfigs,
+    );
   }
 
   Future<AgentSettings> saveSettings(AgentSettings settings) async {
@@ -44,22 +47,22 @@ class AgentService {
 
   AgentConfig? resolveConfig({
     required AgentSettings settings,
-    required List<ServiceGroup> groups,
+    required List<RelayConfig> relayConfigs,
   }) {
-    final groupId = settings.serviceGroupId;
-    if (groupId == null) return null;
+    final relayConfigId = settings.relayConfigId;
+    if (relayConfigId == null) return null;
 
-    for (final group in groups) {
-      if (group.id == groupId) {
+    for (final relayConfig in relayConfigs) {
+      if (relayConfig.id == relayConfigId) {
         return AgentConfig(
-          relayHost: group.relayHost,
-          relayPort: group.relayPort,
+          relayHost: relayConfig.relayHost,
+          relayPort: relayConfig.relayPort,
           deviceId: settings.deviceId,
-          relayApiKey: group.relayApiKey,
+          relayApiKey: relayConfig.relayApiKey,
           password: settings.password,
           shell: settings.shell,
-          useTls: group.useTls,
-          allowBadCertificate: group.allowBadCertificate,
+          useTls: relayConfig.useTls,
+          allowBadCertificate: relayConfig.allowBadCertificate,
         );
       }
     }

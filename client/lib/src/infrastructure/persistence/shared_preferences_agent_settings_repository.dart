@@ -7,7 +7,7 @@ import '../../domain/agent/ports/agent_settings_repository.dart';
 
 class SharedPreferencesAgentSettingsRepository
     implements AgentSettingsRepository {
-  static const _settings = 'agentSettings.v1';
+  static const _settings = 'agentSettings.v2';
 
   @override
   Future<AgentSettings> load() async {
@@ -19,7 +19,7 @@ class SharedPreferencesAgentSettingsRepository
         deviceId: json['deviceId'] as String,
         shell: json['shell'] as String,
         password: json['password'] as String,
-        serviceGroupId: json['serviceGroupId'] as String?,
+        relayConfigId: json['relayConfigId'] as String?,
       );
     }
 
@@ -27,7 +27,7 @@ class SharedPreferencesAgentSettingsRepository
       deviceId: '',
       shell: '',
       password: '',
-      serviceGroupId: null,
+      relayConfigId: null,
     );
   }
 
@@ -40,7 +40,7 @@ class SharedPreferencesAgentSettingsRepository
         'deviceId': settings.deviceId,
         'shell': settings.shell,
         'password': settings.password,
-        'serviceGroupId': settings.serviceGroupId,
+        'relayConfigId': settings.relayConfigId,
       }),
     );
   }

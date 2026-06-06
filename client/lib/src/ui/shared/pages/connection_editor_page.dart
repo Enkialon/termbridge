@@ -4,7 +4,7 @@ import '../../../application/connection/connection_service.dart';
 import '../../../application/connection/terminal_service.dart';
 import '../../../application/relay/relay_service.dart';
 import '../../../domain/connection/entities/connection_profile.dart';
-import '../../../domain/relay/entities/service_group.dart';
+import '../../../domain/relay/entities/relay_config.dart';
 import 'terminal_page.dart';
 
 class ConnectionEditorPage extends StatefulWidget {
@@ -38,8 +38,8 @@ class _ConnectionEditorPageState extends State<ConnectionEditorPage> {
   late final TextEditingController _password;
   late final TextEditingController _username;
 
-  var _serviceGroups = <ServiceGroup>[];
-  String? _selectedServiceGroupId;
+  var _relayConfigs = <RelayConfig>[];
+  String? _selectedRelayConfigId;
   bool _showPassword = false;
   bool _saving = false;
 
@@ -52,23 +52,19 @@ class _ConnectionEditorPageState extends State<ConnectionEditorPage> {
     _sessionId = TextEditingController(text: profile.sessionId);
     _password = TextEditingController(text: profile.password);
     _username = TextEditingController(text: profile.username);
-    _loadServiceGroups();
+    _loadRelayConfigs();
   }
 
-  Future<void> _loadServiceGroups() async {
-    final groups = await widget.relayService.loadAll();
+  Future<void> _loadRelayConfigs() async {
+    final relayConfigs = await widget.relayService.loadAll();
     if (!mounted) return;
-    String? selectedGroupId;
-    for (final group in groups) {
-      if (group.relayHost == widget.profile.relayHost &&
-          group.relayPort == widget.profile.relayPort) {
-        selectedGroupId = group.id;
-        break;
-      }
-    }
+    final selectedRelayConfigId =
+        relayConfigs.any((value) => value.id == widget.profile.relayConfigId)
+            ? widget.profile.relayConfigId
+            : null;
     setState(() {
-      _serviceGroups = groups;
-      _selectedServiceGroupId = selectedGroupId;
+      _relayConfigs = relayConfigs;
+      _selectedRelayConfigId = selectedRelayConfigId;
     });
   }
 
@@ -84,8 +80,8 @@ class _ConnectionEditorPageState extends State<ConnectionEditorPage> {
 
   ConnectionProfile? _profileFromForm() {
     if (!_formKey.currentState!.validate()) return null;
-    final group = _selectedServiceGroup;
-    if (group == null) {
+    final relayConfig = _selectedRelayConfig;
+    if (relayConfig == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('请选择一个中继服务器')),
       );
@@ -93,15 +89,16 @@ class _ConnectionEditorPageState extends State<ConnectionEditorPage> {
     }
     return widget.profile.copyWith(
       name: _name.text.trim(),
-      relayHost: group.relayHost,
-      relayPort: group.relayPort,
+      relayConfigId: relayConfig.id,
+      relayHost: relayConfig.relayHost,
+      relayPort: relayConfig.relayPort,
       deviceId: _deviceId.text.trim(),
       sessionId: _sessionId.text.trim(),
-      relayApiKey: group.relayApiKey,
+      relayApiKey: relayConfig.relayApiKey,
       password: _password.text,
       username: _username.text.trim(),
-      useTls: group.useTls,
-      allowBadCertificate: group.allowBadCertificate,
+      useTls: relayConfig.useTls,
+      allowBadCertificate: relayConfig.allowBadCertificate,
     );
   }
 
@@ -137,15 +134,15 @@ class _ConnectionEditorPageState extends State<ConnectionEditorPage> {
     );
   }
 
-  void _applyServiceGroup(String? id) {
+  void _applyRelayConfig(String? id) {
     setState(() {
-      _selectedServiceGroupId = id;
+      _selectedRelayConfigId = id;
     });
   }
 
-  ServiceGroup? get _selectedServiceGroup {
-    for (final group in _serviceGroups) {
-      if (group.id == _selectedServiceGroupId) return group;
+  RelayConfig? get _selectedRelayConfig {
+    for (final relayConfig in _relayConfigs) {
+      if (relayConfig.id == _selectedRelayConfigId) return relayConfig;
     }
     return null;
   }
@@ -171,7 +168,7 @@ class _ConnectionEditorPageState extends State<ConnectionEditorPage> {
               _Section(
                 title: '接入服务器',
                 children: [
-                  if (_serviceGroups.isEmpty)
+                  if (_relayConfigs.isEmpty)
                     const Padding(
                       padding: EdgeInsets.only(bottom: 12),
                       child: Text('请先在“中继服务器”里添加服务器'),
@@ -180,23 +177,25 @@ class _ConnectionEditorPageState extends State<ConnectionEditorPage> {
                     Padding(
                       padding: const EdgeInsets.only(bottom: 12),
                       child: DropdownButtonFormField<String>(
-                        initialValue: _selectedServiceGroupId,
+                        initialValue: _selectedRelayConfigId,
                         decoration: const InputDecoration(
                           border: OutlineInputBorder(),
                           labelText: '选择中继服务器',
                           prefixIcon: Icon(Icons.hub_outlined, size: 20),
                         ),
-                        items: _serviceGroups
+                        items: _relayConfigs
                             .map(
-                              (group) => DropdownMenuItem(
-                                value: group.id,
+                              (relayConfig) => DropdownMenuItem(
+                                value: relayConfig.id,
                                 child: Text(
-                                  group.name.isEmpty ? '未命名中继服务器' : group.name,
+                                  relayConfig.name.isEmpty
+                                      ? '未命名中继服务器'
+                                      : relayConfig.name,
                                 ),
                               ),
                             )
                             .toList(),
-                        onChanged: _applyServiceGroup,
+                        onChanged: _applyRelayConfig,
                         validator: (value) {
                           if (value == null || value.isEmpty) {
                             return '请选择一个中继服务器';

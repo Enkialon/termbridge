@@ -7,7 +7,7 @@ import '../../domain/connection/ports/connection_profile_repository.dart';
 
 class SharedPreferencesConnectionProfileRepository
     implements ConnectionProfileRepository {
-  static const _profiles = 'profiles.v2';
+  static const _profiles = 'connectionProfiles.v1';
 
   @override
   Future<List<ConnectionProfile>> loadAll() async {
@@ -59,6 +59,7 @@ class SharedPreferencesConnectionProfileRepository
     return ConnectionProfile(
       id: now.toString(),
       name: '',
+      relayConfigId: '',
       relayHost: '',
       relayPort: 0,
       deviceId: '',
