@@ -56,7 +56,6 @@ class RelayService {
 
   Future<RelayConfig> save(RelayConfigInput input) async {
     final selected = input.selected;
-    final test = await testConnection(input);
     final relayConfig = RelayConfig(
       id: selected?.id ?? DateTime.now().microsecondsSinceEpoch.toString(),
       name: input.name,
@@ -66,15 +65,13 @@ class RelayService {
       useTls: input.useTls,
       allowBadCertificate: input.useTls && input.allowBadCertificate,
       updatedAt: DateTime.now(),
-      lastLatencyMs: test.latencyMs,
-      lastTestedAt: test.testedAt,
-      lastTestError: test.errorMessage,
     );
-    await _relayConfigs.save(relayConfig);
-    return relayConfig;
+    final tested = await test(relayConfig);
+    await _relayConfigs.save(tested);
+    return tested;
   }
 
-  Future<RelayConfig> testAndSave(RelayConfig relayConfig) async {
+  Future<RelayConfig> test(RelayConfig relayConfig) async {
     final test = await testConnection(
       RelayConfigInput(
         selected: relayConfig,
@@ -93,7 +90,6 @@ class RelayService {
       clearLastLatency: test.latencyMs == null,
       clearLastTestError: test.errorMessage == null,
     );
-    await _relayConfigs.save(saved);
     return saved;
   }
 

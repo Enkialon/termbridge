@@ -41,13 +41,19 @@ class _RelayPageState extends State<RelayPage> {
     if (_testing.contains(group.id)) return;
     setState(() => _testing.add(group.id));
     try {
-      final saved = await widget.service.testAndSave(group);
+      final tested = await widget.service.test(group);
+      if (!mounted) return;
+      final groups = await _groups;
       if (!mounted) return;
       setState(() {
-        _groups = widget.service.loadAll();
+        _groups = Future.value(
+          groups
+              .map((value) => value.id == tested.id ? tested : value)
+              .toList(),
+        );
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(_relayTestMessage(saved))),
+        SnackBar(content: Text(_relayTestMessage(tested))),
       );
     } finally {
       if (mounted) {
@@ -216,7 +222,7 @@ class _RelayEditorPageState extends State<RelayEditorPage> {
     final saved = await _save();
     if (!mounted || saved == null) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(_relayTestMessage(saved))),
+      SnackBar(content: Text(_relaySaveMessage(saved))),
     );
     Navigator.of(context).pop(true);
   }
@@ -353,6 +359,13 @@ String _relayTestLabel(RelayConfig group) {
 }
 
 String _relayTestMessage(RelayConfig group) {
+  if (group.lastLatencyMs != null) {
+    return '测试成功，延迟 ${group.lastLatencyMs}ms';
+  }
+  return '测试${group.lastTestError ?? '未完成'}';
+}
+
+String _relaySaveMessage(RelayConfig group) {
   if (group.lastLatencyMs != null) {
     return '中继服务器已保存，延迟 ${group.lastLatencyMs}ms';
   }
