@@ -52,9 +52,6 @@ class _RelayPageState extends State<RelayPage> {
               .toList(),
         );
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(_relayTestMessage(tested))),
-      );
     } finally {
       if (mounted) {
         setState(() => _testing.remove(group.id));
@@ -356,13 +353,6 @@ String _relayTestLabel(RelayConfig group) {
   if (group.lastLatencyMs != null) return '${group.lastLatencyMs}ms';
   if (group.lastTestError != null) return group.lastTestError!;
   return '测试';
-}
-
-String _relayTestMessage(RelayConfig group) {
-  if (group.lastLatencyMs != null) {
-    return '测试成功，延迟 ${group.lastLatencyMs}ms';
-  }
-  return '测试${group.lastTestError ?? '未完成'}';
 }
 
 String _relaySaveMessage(RelayConfig group) {
