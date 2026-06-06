@@ -45,6 +45,8 @@ class AgentService {
     return settings;
   }
 
+  Future<List<RelayConfig>> loadRelayConfigs() => _relayConfigs.loadAll();
+
   AgentConfig? _resolveConfig({
     required AgentSettings settings,
     required List<RelayConfig> relayConfigs,

@@ -389,19 +389,18 @@ class _AgentPaneState extends State<_AgentPane> {
   final _deviceId = TextEditingController();
   final _shell = TextEditingController();
   final _password = TextEditingController();
-  var _groups = <RelayConfig>[];
   String? _selectedGroupId;
   var _showPassword = false;
   var _busy = false;
-  var _loaded = false;
+  var _settingsLoaded = false;
 
   @override
   void initState() {
     super.initState();
-    _load();
+    _loadSettings();
   }
 
-  Future<void> _load() async {
+  Future<void> _loadSettings() async {
     final state = await widget.service.load();
     if (!mounted) return;
     final selectedGroupId = state.relayConfigs.any(
@@ -413,9 +412,8 @@ class _AgentPaneState extends State<_AgentPane> {
       _deviceId.text = state.settings.deviceId;
       _shell.text = state.settings.shell;
       _password.text = state.settings.password;
-      _groups = state.relayConfigs;
       _selectedGroupId = selectedGroupId;
-      _loaded = true;
+      _settingsLoaded = true;
     });
   }
 
@@ -481,7 +479,7 @@ class _AgentPaneState extends State<_AgentPane> {
 
   @override
   Widget build(BuildContext context) {
-    if (!_loaded) {
+    if (!_settingsLoaded) {
       return const Center(child: CircularProgressIndicator());
     }
 
@@ -548,38 +546,52 @@ class _AgentPaneState extends State<_AgentPane> {
                   const SizedBox(height: 6),
                   Text('中继服务器', style: Theme.of(context).textTheme.titleSmall),
                   const SizedBox(height: 8),
-                  if (_groups.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.only(bottom: 12),
-                      child: Text('请先在“中继服务器”里添加服务器'),
-                    )
-                  else
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: DropdownButtonFormField<String>(
-                        initialValue: _selectedGroupId,
-                        decoration: const InputDecoration(
-                          border: OutlineInputBorder(),
-                          labelText: '选择中继服务器',
-                          prefixIcon: Icon(Icons.hub_outlined, size: 20),
-                        ),
-                        items: _groups
-                            .map(
-                              (group) => DropdownMenuItem(
-                                value: group.id,
-                                child: Text(
-                                  group.name.isEmpty ? '未命名中继服务器' : group.name,
+                  FutureBuilder<List<RelayConfig>>(
+                    future: widget.service.loadRelayConfigs(),
+                    builder: (context, snapshot) {
+                      if (!snapshot.hasData) {
+                        return const Padding(
+                          padding: EdgeInsets.only(bottom: 12),
+                          child: Center(child: CircularProgressIndicator()),
+                        );
+                      }
+                      final groups = snapshot.data!;
+                      if (groups.isEmpty) {
+                        return const Padding(
+                          padding: EdgeInsets.only(bottom: 12),
+                          child: Text('请先在”中继服务器”里添加服务器'),
+                        );
+                      }
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: DropdownButtonFormField<String>(
+                          value: groups.any((g) => g.id == _selectedGroupId)
+                              ? _selectedGroupId
+                              : null,
+                          decoration: const InputDecoration(
+                            border: OutlineInputBorder(),
+                            labelText: '选择中继服务器',
+                            prefixIcon: Icon(Icons.hub_outlined, size: 20),
+                          ),
+                          items: groups
+                              .map(
+                                (group) => DropdownMenuItem(
+                                  value: group.id,
+                                  child: Text(
+                                    group.name.isEmpty ? '未命名中继服务器' : group.name,
+                                  ),
                                 ),
-                              ),
-                            )
-                            .toList(),
-                        onChanged: online
-                            ? null
-                            : (value) {
-                                setState(() => _selectedGroupId = value);
-                              },
-                      ),
-                    ),
+                              )
+                              .toList(),
+                          onChanged: online
+                              ? null
+                              : (value) {
+                                  setState(() => _selectedGroupId = value);
+                                },
+                        ),
+                      );
+                    },
+                  ),
                   const SizedBox(height: 14),
                   Row(
                     children: [
