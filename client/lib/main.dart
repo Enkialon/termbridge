@@ -11,7 +11,7 @@ Future<void> main() async {
   final bridge = RustCoreBridge(api: api);
   runApp(
     RemoteTerminalApp(
-      services: AppServices.defaults(
+      services: AppServices.create(
         runtime: bridge,
         terminalPort: bridge,
       ),
