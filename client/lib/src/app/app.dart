@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
 
 import 'adaptive_shell.dart';
-import '../core/bridge/core_bridge.dart';
+import 'app_services.dart';
 
 class RemoteTerminalApp extends StatelessWidget {
   const RemoteTerminalApp({
-    this.bridge = const RustCoreBridge(),
+    required this.services,
     super.key,
   });
 
-  final CoreBridge bridge;
+  final AppServices services;
 
   @override
   Widget build(BuildContext context) {
@@ -24,7 +24,7 @@ class RemoteTerminalApp extends StatelessWidget {
         scaffoldBackgroundColor: const Color(0xff0b0f12),
         useMaterial3: true,
       ),
-      home: AdaptiveShell(bridge: bridge),
+      home: AdaptiveShell(services: services),
     );
   }
 }

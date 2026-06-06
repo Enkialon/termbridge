@@ -1,37 +1,36 @@
 import 'package:flutter/material.dart';
 
-import '../agent/services/agent_service.dart';
-import '../agent/ui/agent_page.dart';
-import '../core/bridge/core_bridge.dart';
-import '../controller/ui/connections_page.dart';
-import '../controller/ui/desktop_workspace.dart';
-import '../shared/ui/relay_page.dart';
+import '../ui/desktop/desktop_workspace.dart';
+import '../ui/mobile/pages/agent_page.dart';
+import '../ui/mobile/pages/connections_page.dart';
+import '../ui/mobile/pages/relay_page.dart';
+import 'app_services.dart';
 
 class AdaptiveShell extends StatelessWidget {
   const AdaptiveShell({
-    required this.bridge,
+    required this.services,
     super.key,
   });
 
-  final CoreBridge bridge;
+  final AppServices services;
 
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
         if (constraints.maxWidth >= 900) {
-          return DesktopWorkspace(bridge: bridge);
+          return DesktopWorkspace(services: services);
         }
-        return _MobileShell(bridge: bridge);
+        return _MobileShell(services: services);
       },
     );
   }
 }
 
 class _MobileShell extends StatefulWidget {
-  const _MobileShell({required this.bridge});
+  const _MobileShell({required this.services});
 
-  final CoreBridge bridge;
+  final AppServices services;
 
   @override
   State<_MobileShell> createState() => _MobileShellState();
@@ -43,11 +42,13 @@ class _MobileShellState extends State<_MobileShell> {
   @override
   Widget build(BuildContext context) {
     final pages = [
-      ConnectionsPage(bridge: widget.bridge),
-      AgentPage(
-        service: AgentService(bridge: widget.bridge),
+      ConnectionsPage(
+        connectionService: widget.services.connections,
+        terminalService: widget.services.terminal,
+        relayService: widget.services.relay,
       ),
-      const RelayPage(),
+      AgentPage(service: widget.services.agent),
+      RelayPage(service: widget.services.relay),
     ];
 
     return Scaffold(
